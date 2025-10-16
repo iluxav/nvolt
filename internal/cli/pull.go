@@ -44,6 +44,8 @@ func init() {
 func runPull(machineConfig *services.MachineConfig, outputFile, specificKey string) error {
 	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s", machineConfig.Config.ActiveOrgID)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Machine Key ID: %s", machineConfig.Config.MachineID)))
 
 	if specificKey != "" {
 		fmt.Println(infoStyle.Render(fmt.Sprintf("→ Pulling specific key: %s", specificKey)))
