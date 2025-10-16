@@ -45,9 +45,11 @@ type AddUserToOrgRequest struct {
 
 // AddUserToOrgResponse is the response for adding a user to an organization
 type AddUserToOrgResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	User    *User  `json:"user,omitempty"`
+	Success               bool                 `json:"success"`
+	Message               string               `json:"message"`
+	User                  *User                `json:"user,omitempty"`
+	ProjectEnvironments   []ProjectEnvironment `json:"project_environments,omitempty"`
+	RequiresKeyRewrapping bool                 `json:"requires_key_rewrapping"`
 }
 
 // ModifyUserPermissionsRequest is the request body for modifying user permissions

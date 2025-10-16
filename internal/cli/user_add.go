@@ -40,6 +40,7 @@ Examples:
 
 		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
 		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
+		secretsClient := cmd.Context().Value("secrets_client").(*services.SecretsClient)
 
 		// Determine which org to use
 		targetOrgID := orgID
@@ -79,7 +80,7 @@ Examples:
 			machineConfig.Environment = environment
 		}
 
-		return runUserAdd(aclService, targetOrgID, email, machineConfig.Project, machineConfig.Environment, projectPerms, envPerms)
+		return runUserAdd(aclService, secretsClient, targetOrgID, email, machineConfig.Project, machineConfig.Environment, projectPerms, envPerms)
 	},
 }
 
@@ -101,7 +102,7 @@ func init() {
 	rootCmd.AddCommand(userCmd)
 }
 
-func runUserAdd(aclService *services.ACLService, orgID, email, project, environment, projectPermsStr, envPermsStr string) error {
+func runUserAdd(aclService *services.ACLService, secretsClient *services.SecretsClient, orgID, email, project, environment, projectPermsStr, envPermsStr string) error {
 	fmt.Println(titleStyle.Render("Adding User to Organization"))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Email: %s", email)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Organization ID: %s", orgID)))
@@ -181,6 +182,36 @@ func runUserAdd(aclService *services.ACLService, orgID, email, project, environm
 		if response.User != nil {
 			fmt.Println(infoStyle.Render(fmt.Sprintf("  User ID: %s", response.User.ID)))
 			fmt.Println(infoStyle.Render(fmt.Sprintf("  Name: %s", response.User.Name)))
+		}
+
+		// Re-wrap keys for all project/environment combinations if needed
+		if response.RequiresKeyRewrapping && len(response.ProjectEnvironments) > 0 {
+			fmt.Println("\n" + titleStyle.Render("🔄 Re-wrapping encryption keys..."))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("→ Found %d project/environment combination(s) to sync", len(response.ProjectEnvironments))))
+
+			// Sync each project/environment
+			successCount := 0
+			failedCount := 0
+			for i, pe := range response.ProjectEnvironments {
+				fmt.Printf("\n[%d/%d] Syncing %s/%s...", i+1, len(response.ProjectEnvironments), pe.ProjectName, pe.Environment)
+
+				err := secretsClient.SyncKeys(orgID, pe.ProjectName, pe.Environment)
+				if err != nil {
+					fmt.Println(warnStyle.Render(fmt.Sprintf(" ✗ Failed: %v", err)))
+					failedCount++
+				} else {
+					fmt.Println(successStyle.Render(" ✓"))
+					successCount++
+				}
+			}
+
+			// Summary
+			fmt.Println("\n" + titleStyle.Render("Key Re-wrapping Summary:"))
+			fmt.Println(successStyle.Render(fmt.Sprintf("✓ Successfully synced: %d", successCount)))
+			if failedCount > 0 {
+				fmt.Println(warnStyle.Render(fmt.Sprintf("✗ Failed: %d", failedCount)))
+			}
+			fmt.Println(infoStyle.Render("→ New user can now access synced secrets"))
 		}
 	} else {
 		fmt.Println(errorStyle.Render(fmt.Sprintf("✗ %s", response.Message)))
