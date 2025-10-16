@@ -50,7 +50,6 @@ func init() {
 }
 
 func runLogin(machineConfig *services.MachineConfig) error {
-	fmt.Println(machineConfig)
 	fmt.Println("Logging in...")
 
 	loginURL := fmt.Sprintf("%s/login?machine_id=%s", helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io"), machineConfig.Config.MachineID)
@@ -109,7 +108,7 @@ func pollForToken(machineConfig *services.MachineConfig) error {
 				return fmt.Errorf("failed to save token: %w", err)
 			}
 
-			fmt.Println(successStyle.Render("✓ Successfully authenticated!"))
+			fmt.Println(successStyle.Render("\n✓ Successfully authenticated!\n"))
 			return nil
 		}
 

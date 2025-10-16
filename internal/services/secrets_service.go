@@ -57,7 +57,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
 		if err != nil {
 			// If no existing secrets found, that's OK - just use new variables
-			fmt.Printf("Note: No existing secrets found, creating new scope\n")
+			fmt.Printf("Note: No existing secrets found, creating new project scope\n")
 		} else if pullResp.WrappedKey != "" {
 			// Unwrap the existing master key
 			privateKey, err := s.machineConfig.GetPrivateKey()
@@ -91,7 +91,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 				varsToEncrypt[k] = v // Override or add new
 			}
 
-			fmt.Printf("Merged %d existing variable(s) with %d new variable(s)\n", len(existingVars), len(variables))
+			fmt.Printf("\nMerged %d existing variable(s) with %d new variable(s)\n", len(existingVars), len(variables))
 		}
 	}
 

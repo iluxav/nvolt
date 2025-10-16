@@ -88,7 +88,7 @@ func runPush(machineConfig *services.MachineConfig, vars map[string]string, repl
 	}
 
 	fmt.Println("\n" + successStyle.Render("✓ Successfully pushed secrets!"))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ %d variables are now securely stored", len(vars))))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ %d variables are now securely stored\n", len(vars))))
 
 	return nil
 }

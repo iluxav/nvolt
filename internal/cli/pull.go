@@ -6,7 +6,9 @@ import (
 	"iluxav/nvolt/internal/services"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +42,7 @@ func init() {
 }
 
 func runPull(machineConfig *services.MachineConfig, outputFile, specificKey string) error {
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Project: %s", machineConfig.Project)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
 
 	if specificKey != "" {
@@ -49,9 +51,13 @@ func runPull(machineConfig *services.MachineConfig, outputFile, specificKey stri
 
 	secretsClient := services.NewSecretsClient(machineConfig)
 
-	fmt.Println("\n" + titleStyle.Render("Pulling secrets from server..."))
+	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	s.Suffix = " " + titleStyle.Render("Pulling secrets from server...")
+	s.Start()
 
 	vars, err := secretsClient.PullSecrets(machineConfig.Project, machineConfig.Environment, specificKey)
+	s.Stop()
+	fmt.Print("\033[K")
 	if err != nil {
 		// Check if it's a "no wrapped key" error (new machine not synced yet)
 		if strings.Contains(err.Error(), "no wrapped key") || strings.Contains(err.Error(), "WrappedKey is empty") {
@@ -81,7 +87,7 @@ func runPull(machineConfig *services.MachineConfig, outputFile, specificKey stri
 	} else {
 		// Output to console
 		fmt.Println("\n" + successStyle.Render(fmt.Sprintf("✓ Successfully pulled %d variable(s)!", len(vars))))
-		fmt.Println(titleStyle.Render("\nDecrypted Variables:"))
+		fmt.Println(titleStyle.Render("\nDecrypted Variables:\n"))
 
 		// Sort keys for consistent output
 		keys := make([]string, 0, len(vars))
@@ -99,6 +105,7 @@ func runPull(machineConfig *services.MachineConfig, outputFile, specificKey stri
 			}
 			fmt.Println(listItemStyle.Render(fmt.Sprintf("%s=%s", k, v)))
 		}
+		fmt.Println(infoStyle.Render("\n"))
 	}
 
 	return nil
