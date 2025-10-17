@@ -26,6 +26,9 @@ type MachineKeyDTO struct {
 	MachineID string `json:"machine_id"`
 	Name      string `json:"name"`
 	PublicKey string `json:"public_key"`
+	UserID    string `json:"user_id"`
+	User      *User  `json:"user"`
+	CreatedAt string `json:"created_at"`
 }
 
 type GetMachinesResponseDTO struct {

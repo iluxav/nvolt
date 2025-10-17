@@ -56,12 +56,14 @@ func Execute(machineConfig *services.MachineConfig, aclService *services.ACLServ
 		fmt.Println(warnStyle.Render(fmt.Sprintf("Warning: %v", err)))
 	}
 
-	// Create SecretsClient for commands that need it
+	// Create SecretsClient and MachineService for commands that need it
 	secretsClient := services.NewSecretsClient(machineConfig)
+	machineService := services.NewMachineService(machineConfig.Config)
 
 	ctx := context.WithValue(context.Background(), types.MachineConfigKey, machineConfig)
 	ctx = context.WithValue(ctx, types.ACLServiceKey, aclService)
 	ctx = context.WithValue(ctx, types.SecretsClientKey, secretsClient)
+	ctx = context.WithValue(ctx, types.MachineServiceKey, machineService)
 	return rootCmd.ExecuteContext(ctx)
 }
 
