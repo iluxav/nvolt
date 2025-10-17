@@ -12,6 +12,9 @@ import (
 )
 
 var (
+	// Version is set via -ldflags at build time
+	Version = "dev"
+
 	// Styles for colorful output
 	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D4CDB"))
 	successStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00D084"))
@@ -24,13 +27,17 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "nvolt",
 	Short:   "Secure environment variable synchronization CLI",
-	Version: "0.1.0",
+	Version: Version,
 }
 
 func Execute(machineConfig *services.MachineConfig, aclService *services.ACLService) error {
+	// Skip org resolution for version and help flags
+	isVersionFlag := len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version" || os.Args[1] == "version")
+	isHelpFlag := len(os.Args) > 1 && (os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help")
+
 	// Resolve active organization (only if user is logged in)
 	// Skip for login command to avoid chicken-and-egg issue during first login
-	if machineConfig.Config.JWT_Token != "" {
+	if machineConfig.Config.JWT_Token != "" && !isVersionFlag && !isHelpFlag {
 		// Check if the command being run is 'login' - if so, skip org resolution
 		isLoginCommand := len(os.Args) > 1 && os.Args[1] == "login"
 		if !isLoginCommand {

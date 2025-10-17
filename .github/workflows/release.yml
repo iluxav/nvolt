@@ -53,7 +53,14 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go build -trimpath -ldflags="-s -w" -o ${{ matrix.output }} cli/main.go
+          # Extract version from git tag (remove 'v' prefix if present)
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ ! "$VERSION" =~ ^v[0-9] ]]; then
+            VERSION="dev"
+          fi
+
+          # Build with version injected
+          go build -trimpath -ldflags="-s -w -X iluxav/nvolt/internal/cli.Version=${VERSION}" -o ${{ matrix.output }} cli/main.go
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

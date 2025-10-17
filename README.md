@@ -56,7 +56,7 @@ This ensures **end-to-end encryption** where the server acts purely as encrypted
 ## Installation
 
 ```bash
-curl -fsSL https://install.nvolt.io/install.sh | bash
+curl -fsSL https://install.nvolt.io/latest/install.sh | bash
 ```
 
 ### Verify Installation
@@ -88,6 +88,7 @@ nvolt login
 ```
 
 This will:
+
 - Generate RSA key pair (2048-bit)
 - Store private key in `~/.nvolt/config.json`
 - Send public key to server
@@ -154,6 +155,7 @@ Generate key pair for a new machine (e.g., CI/CD runner). Displays private key *
 #### Secret Management
 
 **`nvolt push`**
+
 ```bash
 # From file
 nvolt push -f .env -p my-app -e staging
@@ -163,6 +165,7 @@ nvolt push -k FOO=bar -k BAZ=qux -p my-app -e staging
 ```
 
 **`nvolt pull`**
+
 ```bash
 # All secrets to console
 nvolt pull -p my-app -e staging
@@ -175,6 +178,7 @@ nvolt pull -k FOO -p my-app -e staging
 ```
 
 **`nvolt run`**
+
 ```bash
 nvolt run -p my-app -e staging -c "python manage.py runserver"
 ```
@@ -340,6 +344,7 @@ jobs:
 ```
 
 **Setup**:
+
 1. On your local machine: `nvolt machine add github-actions`
 2. Copy the displayed private key to GitHub Secrets as `NVOLT_PRIVATE_KEY`
 3. The CI machine will use silent login automatically
@@ -351,6 +356,7 @@ jobs:
 nvolt CLI works with any compatible server implementation. See the [nvolt-server](https://github.com/yourusername/nvolt-server) repository for self-hosting instructions.
 
 Cloud-hosted version available at [nvolt.io](https://nvolt.io) with additional features:
+
 - Advanced audit logging
 - SSO/SAML integration
 - Multi-region replication
