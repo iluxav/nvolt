@@ -55,19 +55,24 @@ This ensures **end-to-end encryption** where the server acts purely as encrypted
 
 ## Installation
 
-### From Source
-
 ```bash
-git clone https://github.com/yourusername/nvolt-cli.git
-cd nvolt-cli
-go build -o nvolt cli/main.go
-sudo mv nvolt /usr/local/bin/
+curl -fsSL https://install.nvolt.io/install.sh | bash
 ```
 
 ### Verify Installation
 
 ```bash
 nvolt --version
+```
+
+### Build from Source
+
+For developers who want to build from source:
+
+```bash
+git clone https://github.com/yourusername/nvolt-cli.git
+cd nvolt-cli
+go build -o nvolt cli/main.go
 ```
 
 ---
