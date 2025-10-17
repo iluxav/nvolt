@@ -110,8 +110,8 @@ jobs:
           mkdir -p upload
           find ./binaries -type f -exec mv {} ./upload/ \;
 
-          # Copy install script from nvolt-cli directory
-          cp nvolt-cli/install.sh upload/install.sh
+          # Copy install script
+          cp install.sh upload/install.sh
           chmod +x upload/install.sh
 
           # Upload each binary to R2
