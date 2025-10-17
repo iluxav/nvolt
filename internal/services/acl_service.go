@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"iluxav/nvolt/internal/helpers"
 	"iluxav/nvolt/internal/types"
@@ -8,6 +9,10 @@ import (
 
 type ACLService struct {
 	config *types.MachineLocalConfig
+}
+
+func ACLServiceFromContext(ctx context.Context) *ACLService {
+	return ctx.Value(types.ACLServiceKey).(*ACLService)
 }
 
 func NewACLService(config *types.MachineLocalConfig) *ACLService {

@@ -30,7 +30,7 @@ Silent login requires ~/.nvolt/private_key.pem file to exist.`,
 		silent, _ := cmd.Flags().GetBool("silent")
 		machineName, _ := cmd.Flags().GetString("machine")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
 
 		if silent {
 			if machineName == "" {

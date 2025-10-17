@@ -28,15 +28,10 @@ This allows new machines to access existing secrets.`,
 		project, _ := cmd.Flags().GetString("project")
 		environment, _ := cmd.Flags().GetString("environment")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		secretsClient := cmd.Context().Value("secrets_client").(*services.SecretsClient)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		machineConfig.TryOverrideWithFlags(project, environment)
 
-		if project != "" {
-			machineConfig.Project = project
-		}
-		if environment != "" {
-			machineConfig.Environment = environment
-		}
+		secretsClient := services.SecretsClientFromContext(cmd.Context())
 
 		activeOrgID := machineConfig.Config.ActiveOrgID
 		if activeOrgID == "" {
@@ -48,14 +43,14 @@ This allows new machines to access existing secrets.`,
 		}
 
 		// Validate required context for single sync
-		if machineConfig.Project == "" || machineConfig.Environment == "" {
+		if machineConfig.GetProject() == "" || machineConfig.GetEnvironment() == "" {
 			return fmt.Errorf("could not determine project or environment. Use --all flag or ensure you're in a project directory")
 		}
 
-		fmt.Println(infoStyle.Render(fmt.Sprintf("🔄 Syncing keys for %s/%s...", machineConfig.Project, machineConfig.Environment)))
+		fmt.Println(infoStyle.Render(fmt.Sprintf("🔄 Syncing keys for %s/%s...", machineConfig.GetProject(), machineConfig.GetEnvironment())))
 
 		// Call the sync operation in secrets service
-		err := secretsClient.SyncKeys(activeOrgID, machineConfig.Project, machineConfig.Environment)
+		err := secretsClient.SyncKeys(activeOrgID, machineConfig.GetProject(), machineConfig.GetEnvironment())
 		if err != nil {
 			return fmt.Errorf("failed to sync keys: %w", err)
 		}

@@ -18,14 +18,10 @@ var pushCmd = &cobra.Command{
 		file, _ := cmd.Flags().GetString("file")
 		keyValues, _ := cmd.Flags().GetStringSlice("key")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
-		if project != "" {
-			machineConfig.Project = project
-		}
-		if environment != "" {
-			machineConfig.Environment = environment
-		}
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		machineConfig.TryOverrideWithFlags(project, environment)
+
+		aclService := services.ACLServiceFromContext(cmd.Context())
 
 		var vars map[string]string
 		var replaceAll bool
@@ -72,8 +68,8 @@ func runPush(machineConfig *services.MachineConfig, aclService *services.ACLServ
 		return fmt.Errorf("failed to fetch active organization name: %w", err)
 	}
 
-	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.GetProject())))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.GetEnvironment())))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s (%s) [%s]", activeOrgName, Role, machineConfig.Config.ActiveOrgID)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Machine Key ID: %s", machineConfig.Config.MachineID)))
 
@@ -89,7 +85,7 @@ func runPush(machineConfig *services.MachineConfig, aclService *services.ACLServ
 
 	fmt.Println("\n" + titleStyle.Render("Pushing secrets to server..."))
 
-	err = secretsClient.PushSecrets(machineConfig.Project, machineConfig.Environment, vars, replaceAll)
+	err = secretsClient.PushSecrets(machineConfig.GetProject(), machineConfig.GetEnvironment(), vars, replaceAll)
 	if err != nil {
 		return err
 	}

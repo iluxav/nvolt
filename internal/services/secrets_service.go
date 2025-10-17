@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"iluxav/nvolt/internal/crypto"
 	"iluxav/nvolt/internal/helpers"
@@ -10,6 +11,10 @@ import (
 
 type SecretsClient struct {
 	machineConfig *MachineConfig
+}
+
+func SecretsClientFromContext(ctx context.Context) *SecretsClient {
+	return ctx.Value(types.SecretsClientKey).(*SecretsClient)
 }
 
 func NewSecretsClient(machineConfig *MachineConfig) *SecretsClient {

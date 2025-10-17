@@ -27,8 +27,8 @@ Examples:
 		email := args[0]
 		orgID, _ := cmd.Flags().GetString("org")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		aclService := services.ACLServiceFromContext(cmd.Context())
 
 		// Determine which org to use
 		targetOrgID := orgID

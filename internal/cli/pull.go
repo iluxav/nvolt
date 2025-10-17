@@ -17,19 +17,15 @@ var pullCmd = &cobra.Command{
 	Short: "Pull environment variables from nvolt.io",
 	Long:  `Pull encrypted environment variables from the server, decrypt them, and output to file or console`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		project, _ := cmd.Flags().GetString("project")
-		environment, _ := cmd.Flags().GetString("environment")
 		file, _ := cmd.Flags().GetString("file")
 		key, _ := cmd.Flags().GetString("key")
+		project, _ := cmd.Flags().GetString("project")
+		environment, _ := cmd.Flags().GetString("environment")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
-		if project != "" {
-			machineConfig.Project = project
-		}
-		if environment != "" {
-			machineConfig.Environment = environment
-		}
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		machineConfig.TryOverrideWithFlags(project, environment)
+
+		aclService := services.ACLServiceFromContext(cmd.Context())
 
 		return runPull(machineConfig, aclService, file, key)
 	},
@@ -48,8 +44,8 @@ func runPull(machineConfig *services.MachineConfig, aclService *services.ACLServ
 		return fmt.Errorf("failed to fetch active organization name: %w", err)
 	}
 
-	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.GetProject())))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.GetEnvironment())))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s (%s) [%s]", activeOrgName, Role, machineConfig.Config.ActiveOrgID)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Machine Key ID: %s", machineConfig.Config.MachineID)))
 
@@ -63,7 +59,7 @@ func runPull(machineConfig *services.MachineConfig, aclService *services.ACLServ
 	s.Suffix = " " + titleStyle.Render("Pulling secrets from server...")
 	s.Start()
 
-	vars, err := secretsClient.PullSecrets(machineConfig.Project, machineConfig.Environment, specificKey)
+	vars, err := secretsClient.PullSecrets(machineConfig.GetProject(), machineConfig.GetEnvironment(), specificKey)
 	s.Stop()
 	fmt.Print("\033[K")
 	if err != nil {

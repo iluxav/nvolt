@@ -38,9 +38,10 @@ Examples:
 		projectPerms, _ := cmd.Flags().GetString("project-permissions")
 		envPerms, _ := cmd.Flags().GetString("environment-permissions")
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
-		secretsClient := cmd.Context().Value("secrets_client").(*services.SecretsClient)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+
+		aclService := services.ACLServiceFromContext(cmd.Context())
+		secretsClient := services.SecretsClientFromContext(cmd.Context())
 
 		// Determine which org to use
 		targetOrgID := orgID
@@ -54,33 +55,23 @@ Examples:
 
 		// If project not provided via flag, prompt for it
 		if project == "" {
-			projectInput, err := promptForProject(machineConfig.Project)
+			projectInput, err := promptForProject(machineConfig.GetProject())
 			if err != nil {
 				return err
 			}
 			project = projectInput
 		}
-
-		// Override project in machine config
-		if project != "" {
-			machineConfig.Project = project
-		}
-
 		// If environment not provided via flag and project is set, prompt for it
 		if environment == "" && project != "" {
-			envInput, err := promptForEnvironment(machineConfig.Environment)
+			envInput, err := promptForEnvironment(machineConfig.GetEnvironment())
 			if err != nil {
 				return err
 			}
 			environment = envInput
 		}
+		machineConfig.TryOverrideWithFlags(project, environment)
 
-		// Override environment in machine config
-		if environment != "" {
-			machineConfig.Environment = environment
-		}
-
-		return runUserAdd(aclService, secretsClient, targetOrgID, email, machineConfig.Project, machineConfig.Environment, projectPerms, envPerms)
+		return runUserAdd(aclService, secretsClient, targetOrgID, email, machineConfig.GetProject(), machineConfig.GetEnvironment(), projectPerms, envPerms)
 	},
 }
 

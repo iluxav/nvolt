@@ -13,8 +13,8 @@ var orgCmd = &cobra.Command{
 	Short: "Manage organization settings",
 	Long:  `Manage organization settings including selecting the active organization`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		aclService := services.ACLServiceFromContext(cmd.Context())
 
 		// Fetch user organizations
 		userOrgs, err := aclService.GetUserOrgs()
@@ -95,8 +95,8 @@ var orgSetCmd = &cobra.Command{
 	Short: "Set the active organization",
 	Long:  `Set the active organization for the current machine. This will be used for all operations unless overridden with the -o flag.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		aclService := services.ACLServiceFromContext(cmd.Context())
 
 		// Fetch user organizations
 		userOrgs, err := aclService.GetUserOrgs()

@@ -28,8 +28,8 @@ Then securely transfer the key file to the destination machine.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		machineName := args[0]
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-		secretsClient := cmd.Context().Value("secrets_client").(*services.SecretsClient)
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		secretsClient := services.SecretsClientFromContext(cmd.Context())
 
 		activeOrgID := machineConfig.Config.ActiveOrgID
 		if activeOrgID == "" {

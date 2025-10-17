@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"iluxav/nvolt/internal/crypto"
@@ -12,14 +13,43 @@ import (
 type MachineConfig struct {
 	Config      *types.MachineLocalConfig
 	OrgUsers    []*types.OrgUser
-	Project     string
-	Environment string
+	project     string
+	environment string
+}
+
+func MachineConfigFromContext(ctx context.Context) *MachineConfig {
+	return ctx.Value(types.MachineConfigKey).(*MachineConfig)
 }
 
 func NewMachineConfigService() *MachineConfig {
 	config := tryLoadConfig()
 	return &MachineConfig{
 		Config: config.Config,
+	}
+}
+
+func (s *MachineConfig) GetProject() string {
+	return s.project
+}
+
+func (s *MachineConfig) GetEnvironment() string {
+	return s.environment
+}
+
+func (s *MachineConfig) OverrideProject(project string) {
+	s.project = project
+}
+
+func (s *MachineConfig) OverrideEnvironment(environment string) {
+	s.environment = environment
+}
+
+func (s *MachineConfig) TryOverrideWithFlags(project string, environment string) {
+	if project != "" {
+		s.OverrideProject(project)
+	}
+	if environment != "" {
+		s.OverrideEnvironment(environment)
 	}
 }
 
@@ -206,14 +236,19 @@ func (s *MachineConfig) SaveJWT(token string) error {
 	return nil
 }
 
-func (s *MachineConfig) TryResolveLocalDirProjectName() *types.ProjectResolver {
+func (s *MachineConfig) TryResolveLocalDirProjectNameAndEnvironment() error {
 	projectResolver, err := helpers.TryGetProjectName()
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to get project name: %w", err)
 	}
-	s.Project = projectResolver.ProjectName
-	s.Environment = "default"
-	return projectResolver
+	s.project = projectResolver.ProjectName
+
+	if s.Config.DefaultEnvironment != "" {
+		s.environment = s.Config.DefaultEnvironment
+	} else {
+		s.environment = "default"
+	}
+	return nil
 }
 
 // SaveActiveOrg saves the active organization ID to the config file

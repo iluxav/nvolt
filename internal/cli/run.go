@@ -29,14 +29,8 @@ var runCmd = &cobra.Command{
 			command = strings.Join(args, " ")
 		}
 
-		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-
-		if project != "" {
-			machineConfig.Project = project
-		}
-		if environment != "" {
-			machineConfig.Environment = environment
-		}
+		machineConfig := services.MachineConfigFromContext(cmd.Context())
+		machineConfig.TryOverrideWithFlags(project, environment)
 
 		return runWithSecrets(machineConfig, command)
 	},
@@ -49,15 +43,16 @@ func init() {
 
 func runWithSecrets(machineConfig *services.MachineConfig, command string) error {
 	fmt.Println(titleStyle.Render("🔐 nvolt run"))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Project: %s", machineConfig.Project)))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Project: %s", machineConfig.GetProject())))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.GetEnvironment())))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Command: %s", command)))
 
 	// Step 1: Pull and decrypt secrets from server
 	fmt.Println("\n" + titleStyle.Render("Pulling secrets from server..."))
 
 	secretsClient := services.NewSecretsClient(machineConfig)
-	vars, err := secretsClient.PullSecrets(machineConfig.Project, machineConfig.Environment, "")
+
+	vars, err := secretsClient.PullSecrets(machineConfig.GetProject(), machineConfig.GetEnvironment(), "")
 	if err != nil {
 		return fmt.Errorf("failed to pull secrets: %w", err)
 	}

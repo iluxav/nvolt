@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iluxav/nvolt/internal/helpers"
 	"iluxav/nvolt/internal/services"
+	"iluxav/nvolt/internal/types"
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
@@ -50,19 +51,17 @@ func Execute(machineConfig *services.MachineConfig, aclService *services.ACLServ
 		}
 	}
 
-	prj := machineConfig.TryResolveLocalDirProjectName()
-	if prj != nil {
-		machineConfig.Project = prj.ProjectName
+	err := machineConfig.TryResolveLocalDirProjectNameAndEnvironment()
+	if err != nil {
+		fmt.Println(warnStyle.Render(fmt.Sprintf("Warning: %v", err)))
 	}
-	// Default environment is "default" as per CLAUDE.md specification
-	machineConfig.Environment = "default"
 
 	// Create SecretsClient for commands that need it
 	secretsClient := services.NewSecretsClient(machineConfig)
 
-	ctx := context.WithValue(context.Background(), "machine_config", machineConfig)
-	ctx = context.WithValue(ctx, "acl_service", aclService)
-	ctx = context.WithValue(ctx, "secrets_client", secretsClient)
+	ctx := context.WithValue(context.Background(), types.MachineConfigKey, machineConfig)
+	ctx = context.WithValue(ctx, types.ACLServiceKey, aclService)
+	ctx = context.WithValue(ctx, types.SecretsClientKey, secretsClient)
 	return rootCmd.ExecuteContext(ctx)
 }
 
