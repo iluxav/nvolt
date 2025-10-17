@@ -19,7 +19,7 @@ var pushCmd = &cobra.Command{
 		keyValues, _ := cmd.Flags().GetStringSlice("key")
 
 		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-
+		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
 		if project != "" {
 			machineConfig.Project = project
 		}
@@ -54,7 +54,7 @@ var pushCmd = &cobra.Command{
 			return fmt.Errorf("either -f (file) or -k (key-value) flag must be specified")
 		}
 
-		return runPush(machineConfig, vars, replaceAll)
+		return runPush(machineConfig, aclService, vars, replaceAll)
 	},
 }
 
@@ -66,9 +66,16 @@ func init() {
 	rootCmd.AddCommand(pushCmd)
 }
 
-func runPush(machineConfig *services.MachineConfig, vars map[string]string, replaceAll bool) error {
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Project: %s", machineConfig.Project)))
+func runPush(machineConfig *services.MachineConfig, aclService *services.ACLService, vars map[string]string, replaceAll bool) error {
+	activeOrgName, Role, err := aclService.GetActiveOrgName(machineConfig.Config.ActiveOrgID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch active organization name: %w", err)
+	}
+
+	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s (%s) [%s]", activeOrgName, Role, machineConfig.Config.ActiveOrgID)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Machine Key ID: %s", machineConfig.Config.MachineID)))
 
 	if replaceAll {
 		fmt.Println(infoStyle.Render("→ Mode: Full replacement (all existing variables will be replaced)"))
@@ -82,7 +89,7 @@ func runPush(machineConfig *services.MachineConfig, vars map[string]string, repl
 
 	fmt.Println("\n" + titleStyle.Render("Pushing secrets to server..."))
 
-	err := secretsClient.PushSecrets(machineConfig.Project, machineConfig.Environment, vars, replaceAll)
+	err = secretsClient.PushSecrets(machineConfig.Project, machineConfig.Environment, vars, replaceAll)
 	if err != nil {
 		return err
 	}

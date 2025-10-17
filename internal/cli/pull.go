@@ -23,7 +23,7 @@ var pullCmd = &cobra.Command{
 		key, _ := cmd.Flags().GetString("key")
 
 		machineConfig := cmd.Context().Value("machine_config").(*services.MachineConfig)
-
+		aclService := cmd.Context().Value("acl_service").(*services.ACLService)
 		if project != "" {
 			machineConfig.Project = project
 		}
@@ -31,7 +31,7 @@ var pullCmd = &cobra.Command{
 			machineConfig.Environment = environment
 		}
 
-		return runPull(machineConfig, file, key)
+		return runPull(machineConfig, aclService, file, key)
 	},
 }
 
@@ -41,10 +41,16 @@ func init() {
 	rootCmd.AddCommand(pullCmd)
 }
 
-func runPull(machineConfig *services.MachineConfig, outputFile, specificKey string) error {
+func runPull(machineConfig *services.MachineConfig, aclService *services.ACLService, outputFile, specificKey string) error {
+
+	activeOrgName, Role, err := aclService.GetActiveOrgName(machineConfig.Config.ActiveOrgID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch active organization name: %w", err)
+	}
+
 	fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", machineConfig.Project)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Environment: %s", machineConfig.Environment)))
-	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s", machineConfig.Config.ActiveOrgID)))
+	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Active Organization: %s (%s) [%s]", activeOrgName, Role, machineConfig.Config.ActiveOrgID)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Machine Key ID: %s", machineConfig.Config.MachineID)))
 
 	if specificKey != "" {

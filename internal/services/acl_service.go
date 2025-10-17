@@ -29,6 +29,20 @@ func (s *ACLService) GetUserOrgs() ([]*types.OrgUser, error) {
 	return *orgUsers, nil
 }
 
+func (s *ACLService) GetActiveOrgName(orgID string) (string, string, error) {
+	userOrgs, err := s.GetUserOrgs()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to fetch organizations: %w", err)
+	}
+	for _, org := range userOrgs {
+		if org.OrgID.String() == orgID {
+
+			return org.Org.Name, org.Role, nil
+		}
+	}
+	return "", "", fmt.Errorf("organization with ID %s not found", orgID)
+}
+
 // AddUserToOrg adds a user to an organization with optional permissions
 func (s *ACLService) AddUserToOrg(orgID string, req *types.AddUserToOrgRequest) (*types.AddUserToOrgResponse, error) {
 	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
