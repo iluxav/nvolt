@@ -1,14 +1,12 @@
 package types
 
-import "github.com/google/uuid"
-
 type OrgUser struct {
-	ID     uuid.UUID `json:"id"`
-	OrgID  uuid.UUID `json:"org_id"`
-	UserID uuid.UUID `json:"user_id"`
-	Role   string    `json:"role"`
-	Org    *Org      `json:"org"`
-	User   *User     `json:"user"`
+	ID     string `json:"id"`
+	OrgID  string `json:"org_id"`
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+	Org    *Org   `json:"org"`
+	User   *User  `json:"user"`
 }
 
 // OrgUsersResponse is the response for listing organization users
@@ -17,14 +15,14 @@ type OrgUsersResponse struct {
 }
 
 type Org struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type User struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Email string    `json:"email"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 // Permission represents permissions for read, write, delete operations
@@ -71,11 +69,11 @@ type ModifyUserPermissionsResponse struct {
 
 // UserPermissions contains all permissions for a user in an organization
 type UserPermissions struct {
-	Email       string               `json:"email"`
-	Role        string               `json:"role"`
-	Projects    []ProjectPermission  `json:"projects"`
-	AllProjects []string             `json:"all_projects"`
-	User        *User                `json:"user,omitempty"`
+	Email       string              `json:"email"`
+	Role        string              `json:"role"`
+	Projects    []ProjectPermission `json:"projects"`
+	AllProjects []string            `json:"all_projects"`
+	User        *User               `json:"user,omitempty"`
 }
 
 // ProjectPermission represents permissions for a specific project

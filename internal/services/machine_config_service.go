@@ -77,7 +77,7 @@ func (s *MachineConfig) SaveMachineConfigToServer() error {
 		}
 
 		// Use the first org
-		orgID = (*orgUsers)[0].OrgID.String()
+		orgID = (*orgUsers)[0].OrgID
 
 		// Save it as active org for future use
 		s.Config.ActiveOrgID = orgID

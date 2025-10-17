@@ -40,7 +40,7 @@ func (s *ACLService) GetActiveOrgName(orgID string) (string, string, error) {
 		return "", "", fmt.Errorf("failed to fetch organizations: %w", err)
 	}
 	for _, org := range userOrgs {
-		if org.OrgID.String() == orgID {
+		if org.OrgID == orgID {
 
 			return org.Org.Name, org.Role, nil
 		}
@@ -72,7 +72,7 @@ func (s *ACLService) RemoveUserFromOrg(orgID string, userEmail string) error {
 	var userID string
 	for _, orgUser := range users {
 		if orgUser.User != nil && orgUser.User.Email == userEmail {
-			userID = orgUser.User.ID.String()
+			userID = orgUser.User.ID
 			break
 		}
 	}
@@ -116,7 +116,7 @@ func (s *ACLService) GetUserPermissions(orgID string, userEmail string) (*types.
 	var userID string
 	for _, orgUser := range users {
 		if orgUser.User != nil && orgUser.User.Email == userEmail {
-			userID = orgUser.User.ID.String()
+			userID = orgUser.User.ID
 			break
 		}
 	}
@@ -145,8 +145,8 @@ func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPe
 
 	var userID string
 	for _, orgUser := range users {
-		if orgUser.User != nil && orgUser.User.Email == req.Email {
-			userID = orgUser.User.ID.String()
+		if orgUser.User != nil && orgUser.UserID == req.Email {
+			userID = orgUser.UserID
 			break
 		}
 	}

@@ -18,13 +18,13 @@ func ResolveActiveOrg(userOrgs []*types.OrgUser, currentActiveOrgID string) (str
 
 	// If user has only one org, use it
 	if len(userOrgs) == 1 {
-		return userOrgs[0].OrgID.String(), nil
+		return userOrgs[0].OrgID, nil
 	}
 
 	// If active_org is set and valid, use it
 	if currentActiveOrgID != "" {
 		for _, org := range userOrgs {
-			if org.OrgID.String() == currentActiveOrgID {
+			if org.OrgID == currentActiveOrgID {
 				return currentActiveOrgID, nil
 			}
 		}
@@ -48,11 +48,11 @@ func ShowOrgSelector(userOrgs []*types.OrgUser) (string, error) {
 	for i, orgUser := range userOrgs {
 		orgName := orgUser.Org.Name
 		if orgName == "" {
-			orgName = orgUser.OrgID.String()
+			orgName = orgUser.OrgID
 		}
 		displayName := fmt.Sprintf("%s (%s)", orgName, orgUser.Role)
 		orgOptions[i] = displayName
-		orgMap[displayName] = orgUser.OrgID.String()
+		orgMap[displayName] = orgUser.OrgID
 	}
 
 	var selectedOrg string

@@ -30,7 +30,7 @@ var orgCmd = &cobra.Command{
 		currentOrgID := machineConfig.Config.ActiveOrgID
 		var currentOrgName string
 		for _, org := range userOrgs {
-			if org.OrgID.String() == currentOrgID {
+			if org.OrgID == currentOrgID {
 				currentOrgName = org.Org.Name
 				break
 			}
@@ -40,7 +40,7 @@ var orgCmd = &cobra.Command{
 		if len(userOrgs) == 1 {
 			orgName := userOrgs[0].Org.Name
 			if orgName == "" {
-				orgName = userOrgs[0].OrgID.String()
+				orgName = userOrgs[0].OrgID
 			}
 			fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Active Organization: %s (%s)", orgName, userOrgs[0].Role)))
 			return nil
@@ -78,7 +78,7 @@ var orgCmd = &cobra.Command{
 		// Find org name for display
 		var newOrgName string
 		for _, org := range userOrgs {
-			if org.OrgID.String() == selectedOrgID {
+			if org.OrgID == selectedOrgID {
 				newOrgName = org.Org.Name
 				break
 			}
@@ -123,7 +123,7 @@ var orgSetCmd = &cobra.Command{
 		// Find org name for display
 		var orgName string
 		for _, org := range userOrgs {
-			if org.OrgID.String() == selectedOrgID {
+			if org.OrgID == selectedOrgID {
 				orgName = org.Org.Name
 				break
 			}
