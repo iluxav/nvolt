@@ -23,8 +23,8 @@ func NewAuthClient(config *types.MachineLocalConfig) *AuthClient {
 
 // RequestChallenge requests an encrypted challenge from server
 func (a *AuthClient) RequestChallenge(machineName string) (string, string, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	url := fmt.Sprintf("%s/api/v1/auth/challenge", serverURL)
+
+	url := fmt.Sprintf("%s/api/v1/auth/challenge", a.config.ServerURL)
 
 	req := map[string]string{"machine_name": machineName}
 	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req)
@@ -77,8 +77,7 @@ func (a *AuthClient) SignChallenge(privateKeyPEM, encryptedChallenge string) (st
 
 // VerifySignature sends signature to server and gets JWT
 func (a *AuthClient) VerifySignature(machineName, challengeID, signature string) (string, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	url := fmt.Sprintf("%s/api/v1/auth/verify", serverURL)
+	url := fmt.Sprintf("%s/api/v1/auth/verify", a.config.ServerURL)
 
 	req := map[string]string{
 		"machine_name": machineName,

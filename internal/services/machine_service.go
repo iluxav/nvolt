@@ -18,8 +18,8 @@ func NewMachineService(config *types.MachineLocalConfig) *MachineService {
 
 // SaveMachineKey saves a machine's public key to the server
 func (s *MachineService) SaveMachineKey(orgID string, req *types.SaveMachinePublicKeyRequestDTO) error {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	machineKeyURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", serverURL, orgID)
+
+	machineKeyURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.config.ServerURL, orgID)
 
 	resp, err := helpers.CallAPIWithPayload[types.SaveMachinePublicKeyResponseDTO](
 		machineKeyURL,

@@ -24,8 +24,6 @@ func NewSecretsClient(machineConfig *MachineConfig) *SecretsClient {
 }
 
 func (s *SecretsClient) PushSecrets(projectName, environment string, variables map[string]string, replaceAll bool) error {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-
 	// Get active org ID from config
 	orgID := s.machineConfig.Config.ActiveOrgID
 	if orgID == "" {
@@ -33,7 +31,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 	}
 
 	// Step 1: Fetch all machine public keys from server
-	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", serverURL, orgID)
+	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
 	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
 	if err != nil {
 		return fmt.Errorf("failed to fetch machines: %w", err)
@@ -57,7 +55,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 	if !replaceAll {
 		// Fetch existing secrets to merge with new ones
 		pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
-			serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
+			s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
 
 		pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
 		if err != nil {
@@ -139,7 +137,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 	}
 
 	// Step 6: Push to server with transaction (server handles concurrency control)
-	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
+	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
 
 	payload := types.PushSecretsRequestDTO{
 		MachineKeyID: currentMachineKeyID,
@@ -161,8 +159,6 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 }
 
 func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string) (map[string]string, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-
 	// Get active org ID from config
 	orgID := s.machineConfig.Config.ActiveOrgID
 	if orgID == "" {
@@ -170,7 +166,7 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 	}
 
 	// Get current machine key ID
-	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", serverURL, orgID)
+	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
 	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch machines: %w", err)
@@ -193,11 +189,11 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 	if specificKey != "" {
 		// Pull specific secret
 		pullURL = fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets/%s?machine_key_id=%s",
-			serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), url.PathEscape(specificKey), currentMachineKeyID)
+			s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), url.PathEscape(specificKey), currentMachineKeyID)
 	} else {
 		// Pull all secrets
 		pullURL = fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
-			serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
+			s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
 	}
 
 	// Fetch encrypted secrets from server
@@ -238,10 +234,8 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 // SyncKeys re-wraps the master key for all machines in the org without modifying secrets
 // This is useful after adding a new machine to enable it to access existing secrets
 func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment string) error {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-
 	// Step 1: Fetch all machines for the org
-	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", serverURL, orgID)
+	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
 	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
 	if err != nil {
 		return fmt.Errorf("failed to fetch machines: %w", err)
@@ -262,7 +256,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 
 	// Step 2: Pull existing secrets to get the current master key
 	pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
-		serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
+		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
 
 	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
 	if err != nil {
@@ -308,7 +302,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 
 	// Step 5: Upload ONLY the wrapped keys (no secret changes)
 	// We'll reuse the existing encrypted variables
-	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", serverURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
+	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
 	requestDTO := types.PushSecretsRequestDTO{
 		Variables:    pullResp.Variables, // Reuse existing encrypted variables
 		WrappedKeys:  wrappedKeys,
@@ -326,8 +320,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 
 // GetProjectEnvironments fetches all project/environment combinations the user has access to
 func (s *SecretsClient) GetProjectEnvironments(orgID string) ([]types.ProjectEnvironment, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	projectEnvsURL := fmt.Sprintf("%s/api/v1/organizations/%s/environments", serverURL, orgID)
+	projectEnvsURL := fmt.Sprintf("%s/api/v1/organizations/%s/environments", s.machineConfig.Config.ServerURL, orgID)
 
 	resp, err := helpers.CallAPI[types.GetProjectEnvironmentsResponseDTO](projectEnvsURL, "GET", s.machineConfig.Config.JWT_Token)
 	if err != nil {

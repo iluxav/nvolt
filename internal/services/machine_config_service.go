@@ -173,7 +173,9 @@ func tryLoadConfig() *MachineConfig {
 
 		config.Config = &types.MachineLocalConfig{}
 		config.Config.MachineID = helpers.GetLocalMachineID()
-		config.Config.ServerURL = helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
+		if config.Config.ServerURL == "" {
+			config.Config.ServerURL = helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
+		}
 		config.Config.JWT_Token = ""
 
 		// Save private key to separate file with secure permissions
@@ -254,6 +256,20 @@ func (s *MachineConfig) TryResolveLocalDirProjectNameAndEnvironment() error {
 // SaveActiveOrg saves the active organization ID to the config file
 func (s *MachineConfig) SaveActiveOrg(orgID string) error {
 	s.Config.ActiveOrgID = orgID
+	saveConfig(s.Config)
+	return nil
+}
+
+// SaveDefaultEnvironment saves the default environment to the config file
+func (s *MachineConfig) SaveDefaultEnvironment(environment string) error {
+	s.Config.DefaultEnvironment = environment
+	saveConfig(s.Config)
+	return nil
+}
+
+// SaveServerURL saves the server URL to the config file
+func (s *MachineConfig) SaveServerURL(serverURL string) error {
+	s.Config.ServerURL = serverURL
 	saveConfig(s.Config)
 	return nil
 }

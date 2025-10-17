@@ -52,7 +52,7 @@ func init() {
 func runLogin(machineConfig *services.MachineConfig) error {
 	fmt.Println("Logging in...")
 
-	loginURL := fmt.Sprintf("%s/login?machine_id=%s", helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io"), machineConfig.Config.MachineID)
+	loginURL := fmt.Sprintf("%s/login?machine_id=%s", machineConfig.Config.ServerURL, machineConfig.Config.MachineID)
 	if err := browser.OpenURL(loginURL); err != nil {
 		fmt.Println(warnStyle.Render("⚠  Failed to open browser automatically"))
 		fmt.Println(infoStyle.Render("→ Please manually open: " + loginURL))
@@ -78,7 +78,7 @@ func runLogin(machineConfig *services.MachineConfig) error {
 }
 
 func pollForToken(machineConfig *services.MachineConfig) error {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
+	serverURL := machineConfig.Config.ServerURL
 	pollURL := fmt.Sprintf("%s/auth/poll?machine_id=%s", serverURL, machineConfig.Config.MachineID)
 	client := &http.Client{}
 

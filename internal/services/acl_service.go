@@ -23,8 +23,8 @@ func NewACLService(config *types.MachineLocalConfig) *ACLService {
 
 // GetUserOrgs fetches all organizations the current user belongs to
 func (s *ACLService) GetUserOrgs() ([]*types.OrgUser, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	userOrgsURL := fmt.Sprintf("%s/api/v1/user/orgs", serverURL)
+
+	userOrgsURL := fmt.Sprintf("%s/api/v1/user/orgs", s.config.ServerURL)
 
 	orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.config.JWT_Token)
 	if err != nil {
@@ -50,8 +50,7 @@ func (s *ACLService) GetActiveOrgName(orgID string) (string, string, error) {
 
 // AddUserToOrg adds a user to an organization with optional permissions
 func (s *ACLService) AddUserToOrg(orgID string, req *types.AddUserToOrgRequest) (*types.AddUserToOrgResponse, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	addUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", serverURL, orgID)
+	addUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", s.config.ServerURL, orgID)
 
 	response, err := helpers.CallAPIWithPayload[types.AddUserToOrgResponse, types.AddUserToOrgRequest](addUserURL, "POST", s.config.JWT_Token, req)
 	if err != nil {
@@ -63,7 +62,6 @@ func (s *ACLService) AddUserToOrg(orgID string, req *types.AddUserToOrgRequest) 
 
 // RemoveUserFromOrg removes a user from an organization
 func (s *ACLService) RemoveUserFromOrg(orgID string, userEmail string) error {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
 
 	// First, list all users to find the user_id by email
 	users, err := s.GetOrgUsers(orgID)
@@ -83,7 +81,7 @@ func (s *ACLService) RemoveUserFromOrg(orgID string, userEmail string) error {
 		return fmt.Errorf("user with email %s not found in organization", userEmail)
 	}
 
-	removeUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", serverURL, orgID, userID)
+	removeUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
 	_, err = helpers.CallAPI[map[string]interface{}](removeUserURL, "DELETE", s.config.JWT_Token)
 	if err != nil {
@@ -95,8 +93,8 @@ func (s *ACLService) RemoveUserFromOrg(orgID string, userEmail string) error {
 
 // GetOrgUsers lists all users in an organization
 func (s *ACLService) GetOrgUsers(orgID string) ([]*types.OrgUser, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-	listUsersURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", serverURL, orgID)
+
+	listUsersURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", s.config.ServerURL, orgID)
 
 	response, err := helpers.CallAPI[types.OrgUsersResponse](listUsersURL, "GET", s.config.JWT_Token)
 	if err != nil {
@@ -108,7 +106,6 @@ func (s *ACLService) GetOrgUsers(orgID string) ([]*types.OrgUser, error) {
 
 // GetUserPermissions retrieves all permissions for a user in an organization
 func (s *ACLService) GetUserPermissions(orgID string, userEmail string) (*types.UserPermissions, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
 
 	// First, list all users to find the user_id by email
 	users, err := s.GetOrgUsers(orgID)
@@ -128,7 +125,7 @@ func (s *ACLService) GetUserPermissions(orgID string, userEmail string) (*types.
 		return nil, fmt.Errorf("user with email %s not found in organization", userEmail)
 	}
 
-	getUserPermsURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", serverURL, orgID, userID)
+	getUserPermsURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
 	permissions, err := helpers.CallAPI[types.UserPermissions](getUserPermsURL, "GET", s.config.JWT_Token)
 	if err != nil {
@@ -140,8 +137,6 @@ func (s *ACLService) GetUserPermissions(orgID string, userEmail string) (*types.
 
 // ModifyUserPermissions modifies user permissions in an organization
 func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPermissionsRequest) (*types.ModifyUserPermissionsResponse, error) {
-	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
-
 	// First, list all users to find the user_id by email
 	users, err := s.GetOrgUsers(orgID)
 	if err != nil {
@@ -160,7 +155,7 @@ func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPe
 		return nil, fmt.Errorf("user with email %s not found in organization", req.Email)
 	}
 
-	modifyUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", serverURL, orgID, userID)
+	modifyUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
 	response, err := helpers.CallAPIWithPayload[types.ModifyUserPermissionsResponse, types.ModifyUserPermissionsRequest](modifyUserURL, "PATCH", s.config.JWT_Token, req)
 	if err != nil {
