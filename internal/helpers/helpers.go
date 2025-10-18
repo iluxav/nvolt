@@ -1,11 +1,11 @@
 package helpers
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
 func GetEnv(key, defaultValue string) string {
@@ -24,14 +24,11 @@ func GetLocalMachineName() string {
 }
 
 func GetLocalMachineID() string {
-	return GetLocalMachineName() + "-" + GenerateShortUniqueID()
+	return GenerateShortUniqueID()
 }
 
 func GenerateShortUniqueID() string {
-	// Generate a random string of 6 characters not from uuid
-	randomString := make([]byte, 6)
-	rand.Read(randomString)
-	return hex.EncodeToString(randomString)
+	return ulid.Make().String()
 }
 
 func ParseKeyValue(kv string) (string, string, error) {

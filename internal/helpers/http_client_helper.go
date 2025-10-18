@@ -8,11 +8,11 @@ import (
 	"net/http"
 )
 
-func CallAPI[R any](url string, method string, jwt string) (*R, error) {
-	return CallAPIWithPayload[R, any](url, method, jwt, nil)
+func CallAPI[R any](url string, method string, jwt string, machineID string) (*R, error) {
+	return CallAPIWithPayload[R, any](url, method, jwt, nil, machineID)
 }
 
-func CallAPIWithPayload[R any, T any](url string, method string, jwt string, body *T) (*R, error) {
+func CallAPIWithPayload[R any, T any](url string, method string, jwt string, body *T, machineID string) (*R, error) {
 	jsonData, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -25,6 +25,7 @@ func CallAPIWithPayload[R any, T any](url string, method string, jwt string, bod
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+jwt)
+	httpReq.Header.Set("X-Machine-ID", machineID)
 
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)

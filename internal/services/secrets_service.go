@@ -32,7 +32,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 
 	// Step 1: Fetch all machine public keys from server
 	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
-	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
+	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch machines: %w", err)
 	}
@@ -57,7 +57,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
 			s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
 
-		pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
+		pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 		if err != nil {
 			// If no existing secrets found, that's OK - just use new variables
 			fmt.Printf("Note: No existing secrets found, creating new project scope\n")
@@ -137,7 +137,13 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 	}
 
 	// Step 6: Push to server with transaction (server handles concurrency control)
-	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
+	pushURL := fmt.Sprintf(
+		"%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets",
+		s.machineConfig.Config.ServerURL,
+		orgID,
+		url.PathEscape(projectName),
+		url.PathEscape(environment),
+	)
 
 	payload := types.PushSecretsRequestDTO{
 		MachineKeyID: currentMachineKeyID,
@@ -146,7 +152,13 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		ReplaceAll:   true, // Always do full replacement now since we re-encrypted everything
 	}
 
-	pushResp, err := helpers.CallAPIWithPayload[types.PushSecretsResponseDTO, types.PushSecretsRequestDTO](pushURL, "POST", s.machineConfig.Config.JWT_Token, &payload)
+	pushResp, err := helpers.CallAPIWithPayload[types.PushSecretsResponseDTO, types.PushSecretsRequestDTO](
+		pushURL,
+		"POST",
+		s.machineConfig.Config.JWT_Token,
+		&payload,
+		s.machineConfig.Config.MachineID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to push secrets: %w", err)
 	}
@@ -167,7 +179,7 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 
 	// Get current machine key ID
 	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
-	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
+	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch machines: %w", err)
 	}
@@ -197,7 +209,7 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 	}
 
 	// Fetch encrypted secrets from server
-	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
+	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull secrets: %w", err)
 	}
@@ -236,7 +248,7 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment string) error {
 	// Step 1: Fetch all machines for the org
 	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
-	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token)
+	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch machines: %w", err)
 	}
@@ -258,7 +270,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 	pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
 		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
 
-	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token)
+	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch existing secrets: %w", err)
 	}
@@ -310,7 +322,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 		MachineKeyID: currentMachineKeyID,
 	}
 
-	_, err = helpers.CallAPIWithPayload[types.PushSecretsResponseDTO](pushURL, "POST", s.machineConfig.Config.JWT_Token, &requestDTO)
+	_, err = helpers.CallAPIWithPayload[types.PushSecretsResponseDTO](pushURL, "POST", s.machineConfig.Config.JWT_Token, &requestDTO, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to upload wrapped keys: %w", err)
 	}
@@ -322,7 +334,7 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 func (s *SecretsClient) GetProjectEnvironments(orgID string) ([]types.ProjectEnvironment, error) {
 	projectEnvsURL := fmt.Sprintf("%s/api/v1/organizations/%s/environments", s.machineConfig.Config.ServerURL, orgID)
 
-	resp, err := helpers.CallAPI[types.GetProjectEnvironmentsResponseDTO](projectEnvsURL, "GET", s.machineConfig.Config.JWT_Token)
+	resp, err := helpers.CallAPI[types.GetProjectEnvironmentsResponseDTO](projectEnvsURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch project environments: %w", err)
 	}

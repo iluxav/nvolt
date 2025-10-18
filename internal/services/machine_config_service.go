@@ -67,7 +67,7 @@ func (s *MachineConfig) SaveMachineConfigToServer() error {
 	} else {
 		// Fetch user orgs and use the first one (for first-time login)
 		userOrgsURL := fmt.Sprintf("%s/api/v1/user/orgs", serverURL)
-		orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.Config.JWT_Token)
+		orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.Config.JWT_Token, s.Config.MachineID)
 		if err != nil {
 			return fmt.Errorf("failed to fetch user organizations: %w", err)
 		}
@@ -104,7 +104,13 @@ func (s *MachineConfig) SaveMachineConfigToServer() error {
 		Name:      helpers.GetLocalMachineName(),
 		PublicKey: publicKey,
 	}
-	_, err = helpers.CallAPIWithPayload[types.SaveMachinePublicKeyResponseDTO, types.SaveMachinePublicKeyRequestDTO](saveMachineKeyURL, "POST", s.Config.JWT_Token, requestBody)
+	_, err = helpers.CallAPIWithPayload[types.SaveMachinePublicKeyResponseDTO](
+		saveMachineKeyURL,
+		"POST",
+		s.Config.JWT_Token,
+		requestBody,
+		s.Config.MachineID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to save machine key: %w", err)
 	}

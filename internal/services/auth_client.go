@@ -27,7 +27,7 @@ func (a *AuthClient) RequestChallenge(machineName string) (string, string, error
 	url := fmt.Sprintf("%s/api/v1/auth/challenge", a.config.ServerURL)
 
 	req := map[string]string{"machine_name": machineName}
-	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req)
+	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req, a.config.MachineID)
 	if err != nil {
 		return "", "", err
 	}
@@ -85,7 +85,7 @@ func (a *AuthClient) VerifySignature(machineName, challengeID, signature string)
 		"signature":    signature,
 	}
 
-	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req)
+	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req, a.config.MachineID)
 	if err != nil {
 		return "", err
 	}

@@ -26,7 +26,7 @@ func (s *ACLService) GetUserOrgs() ([]*types.OrgUser, error) {
 
 	userOrgsURL := fmt.Sprintf("%s/api/v1/user/orgs", s.config.ServerURL)
 
-	orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.config.JWT_Token)
+	orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.config.JWT_Token, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user organizations: %w", err)
 	}
@@ -52,7 +52,7 @@ func (s *ACLService) GetActiveOrgName(orgID string) (string, string, error) {
 func (s *ACLService) AddUserToOrg(orgID string, req *types.AddUserToOrgRequest) (*types.AddUserToOrgResponse, error) {
 	addUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", s.config.ServerURL, orgID)
 
-	response, err := helpers.CallAPIWithPayload[types.AddUserToOrgResponse, types.AddUserToOrgRequest](addUserURL, "POST", s.config.JWT_Token, req)
+	response, err := helpers.CallAPIWithPayload[types.AddUserToOrgResponse, types.AddUserToOrgRequest](addUserURL, "POST", s.config.JWT_Token, req, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add user to organization: %w", err)
 	}
@@ -83,7 +83,7 @@ func (s *ACLService) RemoveUserFromOrg(orgID string, userEmail string) error {
 
 	removeUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
-	_, err = helpers.CallAPI[map[string]interface{}](removeUserURL, "DELETE", s.config.JWT_Token)
+	_, err = helpers.CallAPI[map[string]interface{}](removeUserURL, "DELETE", s.config.JWT_Token, s.config.MachineID)
 	if err != nil {
 		return fmt.Errorf("failed to remove user from organization: %w", err)
 	}
@@ -96,7 +96,7 @@ func (s *ACLService) GetOrgUsers(orgID string) ([]*types.OrgUser, error) {
 
 	listUsersURL := fmt.Sprintf("%s/api/v1/organizations/%s/users", s.config.ServerURL, orgID)
 
-	response, err := helpers.CallAPI[types.OrgUsersResponse](listUsersURL, "GET", s.config.JWT_Token)
+	response, err := helpers.CallAPI[types.OrgUsersResponse](listUsersURL, "GET", s.config.JWT_Token, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list organization users: %w", err)
 	}
@@ -127,7 +127,7 @@ func (s *ACLService) GetUserPermissions(orgID string, userEmail string) (*types.
 
 	getUserPermsURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
-	permissions, err := helpers.CallAPI[types.UserPermissions](getUserPermsURL, "GET", s.config.JWT_Token)
+	permissions, err := helpers.CallAPI[types.UserPermissions](getUserPermsURL, "GET", s.config.JWT_Token, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user permissions: %w", err)
 	}
@@ -157,7 +157,7 @@ func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPe
 
 	modifyUserURL := fmt.Sprintf("%s/api/v1/organizations/%s/users/%s", s.config.ServerURL, orgID, userID)
 
-	response, err := helpers.CallAPIWithPayload[types.ModifyUserPermissionsResponse, types.ModifyUserPermissionsRequest](modifyUserURL, "PATCH", s.config.JWT_Token, req)
+	response, err := helpers.CallAPIWithPayload[types.ModifyUserPermissionsResponse, types.ModifyUserPermissionsRequest](modifyUserURL, "PATCH", s.config.JWT_Token, req, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to modify user permissions: %w", err)
 	}

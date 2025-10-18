@@ -83,7 +83,15 @@ func pollForToken(machineConfig *services.MachineConfig) error {
 	client := &http.Client{}
 
 	for i := 0; i < 60; i++ {
-		resp, err := client.Get(pollURL)
+		req, err := http.NewRequest("GET", pollURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Add("X-Machine-ID", machineConfig.Config.MachineID)
+		fmt.Println("Polling for token...")
+
+		fmt.Println(machineConfig.Config.MachineID)
+		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println(warnStyle.Render(fmt.Sprintf("⚠  Poll error: %v", err)))
 			time.Sleep(2 * time.Second)

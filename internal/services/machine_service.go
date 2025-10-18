@@ -31,8 +31,9 @@ func (s *MachineService) SaveMachineKey(orgID string, req *types.SaveMachinePubl
 		"POST",
 		s.config.JWT_Token,
 		req,
+		s.config.MachineID,
 	)
-	if err != nil {
+	if err != nil || !resp.Success {
 		return fmt.Errorf("failed to save machine key: %w", err)
 	}
 
@@ -51,7 +52,7 @@ func (s *MachineService) GetOrgMachines(orgID string) ([]types.MachineKeyDTO, er
 		Machines []types.MachineKeyDTO `json:"machines"`
 	}
 
-	resp, err := helpers.CallAPI[Response](machinesURL, "GET", s.config.JWT_Token)
+	resp, err := helpers.CallAPI[Response](machinesURL, "GET", s.config.JWT_Token, s.config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch machines: %w", err)
 	}
