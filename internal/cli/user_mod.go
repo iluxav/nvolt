@@ -135,9 +135,8 @@ func runUserModify(aclService *services.ACLService, orgID, email string) error {
 	var availableEnvs []string
 	for _, proj := range currentPerms.Projects {
 		if proj.ProjectName == selectedProject {
-			for _, env := range proj.Environments {
-				availableEnvs = append(availableEnvs, env.Environment)
-			}
+			// Use AllEnvironments instead of just environments user has access to
+			availableEnvs = proj.AllEnvironments
 			break
 		}
 	}

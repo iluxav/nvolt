@@ -78,9 +78,10 @@ type UserPermissions struct {
 
 // ProjectPermission represents permissions for a specific project
 type ProjectPermission struct {
-	ProjectName  string                  `json:"project_name"`
-	Permissions  Permission              `json:"permissions"`
-	Environments []EnvironmentPermission `json:"environments"`
+	ProjectName     string                  `json:"project_name"`
+	Permissions     Permission              `json:"permissions"`
+	Environments    []EnvironmentPermission `json:"environments"`     // Environments the user has access to
+	AllEnvironments []string                `json:"all_environments"` // All environments that exist for this project
 }
 
 // EnvironmentPermission represents permissions for a specific environment

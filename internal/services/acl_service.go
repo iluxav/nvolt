@@ -145,8 +145,8 @@ func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPe
 
 	var userID string
 	for _, orgUser := range users {
-		if orgUser.User != nil && orgUser.UserID == req.Email {
-			userID = orgUser.UserID
+		if orgUser.User != nil && orgUser.User.Email == req.Email {
+			userID = orgUser.User.ID
 			break
 		}
 	}

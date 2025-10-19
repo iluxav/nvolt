@@ -90,7 +90,6 @@ func pollForToken(machineConfig *services.MachineConfig) error {
 		req.Header.Add("X-Machine-ID", machineConfig.Config.MachineID)
 		fmt.Println("Polling for token...")
 
-		fmt.Println(machineConfig.Config.MachineID)
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println(warnStyle.Render(fmt.Sprintf("⚠  Poll error: %v", err)))
