@@ -21,6 +21,12 @@ const (
 	UsersTab
 )
 
+// Organization represents an organization
+type Organization struct {
+	ID   string
+	Name string
+}
+
 // Project represents a project with its environments
 type Project struct {
 	Name         string

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iluxav/nvolt/internal/services"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -16,6 +17,8 @@ type Model struct {
 	aclService    *services.ACLService
 
 	// Data
+	organizations      []Organization
+	activeOrgIndex     int
 	projects           []Project
 	activeProjectIndex int
 	environments       []Environment
@@ -44,10 +47,30 @@ func NewModel(
 	aclService *services.ACLService,
 	projectName string,
 ) Model {
+	// Load organizations from machineConfig
+	organizations := []Organization{}
+	activeOrgIndex := 0
+	if machineConfig != nil && machineConfig.OrgUsers != nil {
+		for i, orgUser := range machineConfig.OrgUsers {
+			if orgUser.Org != nil {
+				organizations = append(organizations, Organization{
+					ID:   orgUser.Org.ID,
+					Name: orgUser.Org.Name,
+				})
+				// Set active org based on ActiveOrgID in config
+				if machineConfig.Config != nil && orgUser.Org.ID == machineConfig.Config.ActiveOrgID {
+					activeOrgIndex = i
+				}
+			}
+		}
+	}
+
 	return Model{
 		machineConfig:      machineConfig,
 		secretsClient:      secretsClient,
 		aclService:         aclService,
+		organizations:      organizations,
+		activeOrgIndex:     activeOrgIndex,
 		projects:           []Project{},
 		activeProjectIndex: 0,
 		environments:       []Environment{},
@@ -302,8 +325,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 
 			} else if m.focusedPanel == RightPanel && m.activeTab == VariablesTab && len(m.variables) > 0 {
-				// Toggle reveal/hide value for selected variable
-				m.variables[m.variablesCursor].IsRevealed = !m.variables[m.variablesCursor].IsRevealed
+				// Copy variable value to clipboard
+				selectedVar := m.variables[m.variablesCursor]
+				err := clipboard.WriteAll(selectedVar.Value)
+				if err != nil {
+					m.err = fmt.Errorf("failed to copy to clipboard: %w", err)
+				}
 			}
 			return m, nil
 
@@ -419,8 +446,14 @@ func (m Model) renderHeader() string {
 	// Compact one-line logo
 	logo := renderCompactLogo()
 
-	// Project and environment info
-	var projectName, envName string
+	// Organization, project and environment info
+	var orgName, projectName, envName string
+	if len(m.organizations) > 0 && m.activeOrgIndex < len(m.organizations) {
+		orgName = m.organizations[m.activeOrgIndex].Name
+	} else {
+		orgName = "Loading..."
+	}
+
 	if len(m.projects) > 0 && m.activeProjectIndex < len(m.projects) {
 		projectName = m.projects[m.activeProjectIndex].Name
 	} else {
@@ -432,6 +465,11 @@ func (m Model) renderHeader() string {
 	} else {
 		envName = "Loading..."
 	}
+
+	// Organization section
+	orgLabel := headerStyle.Render("Organization:")
+	orgTag := tagStyle.Render(orgName)
+	orgSection := lipgloss.JoinHorizontal(lipgloss.Bottom, orgLabel, " ", orgTag)
 
 	// Project section
 	projectLabel := headerStyle.Render("Project:")
@@ -447,6 +485,8 @@ func (m Model) renderHeader() string {
 	content := lipgloss.JoinHorizontal(
 		lipgloss.Bottom,
 		logo,
+		"   ",
+		orgSection,
 		"   ",
 		projectSection,
 		"   ",
@@ -472,7 +512,7 @@ func (m Model) renderHelp() string {
 		"v/u: Jump to Variables/Users | " +
 		"←/→: Switch tabs (in right panel) or environments | " +
 		"↑/↓: Navigate items | " +
-		"Enter: Select project or reveal value | " +
+		"Enter: Select project or copy value to clipboard | " +
 		"Delete: Remove item | " +
 		"q: Quit"
 
