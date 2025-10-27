@@ -1,12 +1,13 @@
 package types
 
 type OrgUser struct {
-	ID     string `json:"id"`
-	OrgID  string `json:"org_id"`
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	Org    *Org   `json:"org"`
-	User   *User  `json:"user"`
+	ID          string           `json:"id"`
+	OrgID       string           `json:"org_id"`
+	UserID      string           `json:"user_id"`
+	Role        string           `json:"role"`
+	Org         *Org             `json:"org"`
+	User        *User            `json:"user"`
+	Permissions *UserPermissions `json:"-"` // Client-side only, fetched separately
 }
 
 // OrgUsersResponse is the response for listing organization users

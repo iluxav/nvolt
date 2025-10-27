@@ -80,8 +80,8 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 
 			// Decrypt all existing variables
 			existingVars := make(map[string]string)
-			for key, encryptedValue := range pullResp.Variables {
-				decryptedValue, err := crypto.DecryptWithMasterKey(oldMasterKey, encryptedValue)
+			for key, varMeta := range pullResp.Variables {
+				decryptedValue, err := crypto.DecryptWithMasterKey(oldMasterKey, varMeta.Value)
 				if err != nil {
 					return fmt.Errorf("failed to decrypt existing variable %s: %w", key, err)
 				}
@@ -232,8 +232,8 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 
 	// Decrypt all variables using the master key
 	decryptedVars := make(map[string]string)
-	for key, encryptedValue := range pullResp.Variables {
-		decryptedValue, err := crypto.DecryptWithMasterKey(masterKey, encryptedValue)
+	for key, varMeta := range pullResp.Variables {
+		decryptedValue, err := crypto.DecryptWithMasterKey(masterKey, varMeta.Value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt variable %s: %w", key, err)
 		}
@@ -313,10 +313,15 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 	fmt.Printf("Re-wrapped keys for %d machine(s)\n", len(wrappedKeys))
 
 	// Step 5: Upload ONLY the wrapped keys (no secret changes)
-	// We'll reuse the existing encrypted variables
+	// We'll reuse the existing encrypted variables (extract just values without metadata)
+	existingVars := make(map[string]string)
+	for key, varMeta := range pullResp.Variables {
+		existingVars[key] = varMeta.Value
+	}
+
 	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets", s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment))
 	requestDTO := types.PushSecretsRequestDTO{
-		Variables:    pullResp.Variables, // Reuse existing encrypted variables
+		Variables:    existingVars, // Reuse existing encrypted variables
 		WrappedKeys:  wrappedKeys,
 		ReplaceAll:   true,
 		MachineKeyID: currentMachineKeyID,
@@ -328,6 +333,75 @@ func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment s
 	}
 
 	return nil
+}
+
+// PullSecretsWithMetadata returns decrypted variables along with their metadata (creation date)
+func (s *SecretsClient) PullSecretsWithMetadata(projectName, environment string) (map[string]types.VariableWithMetadata, error) {
+	// Get active org ID from config
+	orgID := s.machineConfig.Config.ActiveOrgID
+	if orgID == "" {
+		return nil, fmt.Errorf("no active organization set. Please run 'nvolt org set' first")
+	}
+
+	// Get current machine key ID
+	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
+	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch machines: %w", err)
+	}
+
+	var currentMachineKeyID string
+	for _, machine := range machinesResp.Machines {
+		if machine.MachineID == s.machineConfig.Config.MachineID {
+			currentMachineKeyID = machine.ID
+			break
+		}
+	}
+
+	if currentMachineKeyID == "" {
+		return nil, fmt.Errorf("current machine not found in authorized machines")
+	}
+
+	// Pull all secrets
+	pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
+		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
+
+	// Fetch encrypted secrets from server
+	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull secrets: %w", err)
+	}
+
+	// Unwrap the master key using machine's private key
+	privateKey, err := s.machineConfig.GetPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get private key: %w", err)
+	}
+	masterKey, err := crypto.UnwrapMasterKey(privateKey, pullResp.WrappedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unwrap master key: %w", err)
+	}
+	defer func() {
+		// Clear master key from memory
+		for i := range masterKey {
+			masterKey[i] = 0
+		}
+	}()
+
+	// Decrypt all variables using the master key and preserve metadata
+	decryptedVars := make(map[string]types.VariableWithMetadata)
+	for key, varMeta := range pullResp.Variables {
+		decryptedValue, err := crypto.DecryptWithMasterKey(masterKey, varMeta.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt variable %s: %w", key, err)
+		}
+		decryptedVars[key] = types.VariableWithMetadata{
+			Value:     decryptedValue,
+			CreatedAt: varMeta.CreatedAt,
+		}
+	}
+
+	return decryptedVars, nil
 }
 
 // GetProjectEnvironments fetches all project/environment combinations the user has access to

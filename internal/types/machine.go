@@ -1,5 +1,7 @@
 package types
 
+import "encoding/json"
+
 type SaveMachinePublicKeyRequestDTO struct {
 	MachineID string `json:"machine_id"`
 	Name      string `json:"name"`
@@ -51,9 +53,34 @@ type PushSecretsResponseDTO struct {
 	Message string `json:"message"`
 }
 
+type VariableWithMetadata struct {
+	Value     string `json:"value"`
+	CreatedAt string `json:"created_at"`
+}
+
+// UnmarshalJSON handles backward compatibility - if we receive a plain string, treat it as the Value
+func (v *VariableWithMetadata) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as a plain string first (old format)
+	var plainString string
+	if err := json.Unmarshal(data, &plainString); err == nil {
+		v.Value = plainString
+		v.CreatedAt = ""
+		return nil
+	}
+
+	// Otherwise, unmarshal as the full metadata object (new format)
+	type Alias VariableWithMetadata
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(v),
+	}
+	return json.Unmarshal(data, &aux)
+}
+
 type PullSecretsResponseDTO struct {
-	Variables  map[string]string `json:"variables"`   // key -> encrypted value
-	WrappedKey string            `json:"wrapped_key"` // wrapped master key for this machine
+	Variables  map[string]VariableWithMetadata `json:"variables"`   // key -> encrypted value with metadata
+	WrappedKey string                          `json:"wrapped_key"` // wrapped master key for this machine
 }
 
 type ProjectEnvironment struct {

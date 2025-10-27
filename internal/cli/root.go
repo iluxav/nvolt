@@ -16,19 +16,38 @@ var (
 	// Version is set via -ldflags at build time
 	Version = "dev"
 
-	// Styles for colorful output
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D4CDB"))
+	// Styles for colorful output - matching nvolt.io branding
+	brandColor    = lipgloss.Color("#FFC107") // Yellow/gold brand color
+	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(brandColor)
 	successStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00D084"))
 	errorStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6B6B"))
 	infoStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4"))
 	warnStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
 	listItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4"))
+
+	// ASCII Logo
+	logoText = `
+    ███╗   ██╗██╗   ██╗ ██████╗ ██╗  ████████╗
+    ████╗  ██║██║   ██║██╔═══██╗██║  ╚══██╔══╝
+    ██╔██╗ ██║██║   ██║██║   ██║██║     ██║
+    ██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ██║
+    ██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗██║
+    ╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝╚═╝
+    `
 )
 
 var rootCmd = &cobra.Command{
 	Use:     "nvolt",
 	Short:   "Secure environment variable synchronization CLI",
+	Long:    renderLogo() + "\n\n" + "Ultra-secure, Zero-Trust, CLI-first environment variable manager",
 	Version: Version,
+}
+
+func renderLogo() string {
+	logoStyle := lipgloss.NewStyle().
+		Foreground(brandColor).
+		Bold(true)
+	return logoStyle.Render(logoText)
 }
 
 func Execute(machineConfig *services.MachineConfig, aclService *services.ACLService) error {
