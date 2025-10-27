@@ -9,6 +9,76 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// loadProjects fetches all projects with their environments
+func (m Model) loadProjects() tea.Cmd {
+	return func() tea.Msg {
+		orgID := m.machineConfig.Config.ActiveOrgID
+
+		// Fetch all project/environment combinations
+		projectEnvs, err := m.secretsClient.GetProjectEnvironments(orgID)
+		if err != nil {
+			return loadProjectsMsg{
+				projects: nil,
+				err:      fmt.Errorf("failed to fetch projects: %w", err),
+			}
+		}
+
+		// Group environments by project
+		projectMap := make(map[string][]string)
+		for _, pe := range projectEnvs {
+			projectMap[pe.ProjectName] = append(projectMap[pe.ProjectName], pe.Environment)
+		}
+
+		// Convert map to slice of Project structs
+		projects := make([]Project, 0, len(projectMap))
+		for projectName, envs := range projectMap {
+			// Sort environments (default first, then alphabetically)
+			sortedEnvs := make([]string, 0, len(envs))
+			for _, env := range envs {
+				if env == "default" {
+					sortedEnvs = append([]string{"default"}, sortedEnvs...)
+				} else {
+					sortedEnvs = append(sortedEnvs, env)
+				}
+			}
+
+			// Simple bubble sort for non-default environments
+			if len(sortedEnvs) > 1 {
+				start := 0
+				if sortedEnvs[0] == "default" {
+					start = 1
+				}
+				for i := start; i < len(sortedEnvs)-1; i++ {
+					for j := i + 1; j < len(sortedEnvs); j++ {
+						if sortedEnvs[i] > sortedEnvs[j] {
+							sortedEnvs[i], sortedEnvs[j] = sortedEnvs[j], sortedEnvs[i]
+						}
+					}
+				}
+			}
+
+			projects = append(projects, Project{
+				Name:         projectName,
+				Environments: sortedEnvs,
+			})
+		}
+
+		// Sort projects alphabetically
+		for i := 0; i < len(projects)-1; i++ {
+			for j := i + 1; j < len(projects); j++ {
+				if projects[i].Name > projects[j].Name {
+					projects[i], projects[j] = projects[j], projects[i]
+				}
+			}
+		}
+
+		return loadProjectsMsg{
+			projects: projects,
+			err:      nil,
+		}
+	}
+}
+
 // loadEnvironments fetches all environments for the current project
 func (m Model) loadEnvironments() tea.Cmd {
 	return func() tea.Msg {
@@ -24,9 +94,18 @@ func (m Model) loadEnvironments() tea.Cmd {
 		}
 
 		// Filter environments for this specific project
+		if len(m.projects) == 0 {
+			return loadEnvironmentsMsg{
+				environments: []string{},
+				err:          nil,
+			}
+		}
+
+		currentProjectName := m.projects[m.activeProjectIndex].Name
+
 		envMap := make(map[string]bool)
 		for _, pe := range projectEnvs {
-			if pe.ProjectName == m.projectName {
+			if pe.ProjectName == currentProjectName {
 				envMap[pe.Environment] = true
 			}
 		}
@@ -79,11 +158,20 @@ func (m Model) loadEnvironments() tea.Cmd {
 // loadData fetches variables and users for the current environment
 func (m Model) loadData() tea.Cmd {
 	return func() tea.Msg {
-		// Get the active environment name
+		// Get the active project and environment name
+		if len(m.projects) == 0 || len(m.environments) == 0 {
+			return loadDataMsg{
+				variables: make(map[string]types.VariableWithMetadata),
+				users:     []*types.OrgUser{},
+				err:       nil,
+			}
+		}
+
+		projectName := m.projects[m.activeProjectIndex].Name
 		envName := m.environments[m.activeEnvIndex].Name
 
 		// Fetch variables with metadata
-		varsWithMeta, err := m.secretsClient.PullSecretsWithMetadata(m.projectName, envName)
+		varsWithMeta, err := m.secretsClient.PullSecretsWithMetadata(projectName, envName)
 		if err != nil {
 			// Check if it's a "no data" error vs actual error
 			if strings.Contains(err.Error(), "no wrapped key") ||

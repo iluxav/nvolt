@@ -34,8 +34,19 @@ func formatPermissions(perms *types.Permission) string {
 
 // renderUsersPanel renders the right panel with users
 func (m Model) renderUsersPanel(width int) string {
-	// Panel title
-	title := titleStyle.Render(fmt.Sprintf("Users in %s, %s", m.projectName, m.environments[m.activeEnvIndex].Name))
+	// Panel title with current project and environment
+	var projectName, envName string
+	if len(m.projects) > 0 {
+		projectName = m.projects[m.activeProjectIndex].Name
+	} else {
+		projectName = "..."
+	}
+	if len(m.environments) > 0 {
+		envName = m.environments[m.activeEnvIndex].Name
+	} else {
+		envName = "..."
+	}
+	title := titleStyle.Render(fmt.Sprintf("Users in %s, %s", projectName, envName))
 
 	// Table headers
 	headers := []string{"Name", "Email", "Project Perms", "Env Perms", "Org Role"}

@@ -9,9 +9,16 @@ import (
 type FocusedPanel int
 
 const (
-	VariablesPanel FocusedPanel = iota
+	ProjectsPanel FocusedPanel = iota
+	VariablesPanel
 	UsersPanel
 )
+
+// Project represents a project with its environments
+type Project struct {
+	Name         string
+	Environments []string
+}
 
 // EnvVariable represents an environment variable
 type EnvVariable struct {
@@ -56,6 +63,11 @@ type loadDataMsg struct {
 type loadEnvironmentsMsg struct {
 	environments []string
 	err          error
+}
+
+type loadProjectsMsg struct {
+	projects []Project
+	err      error
 }
 
 type errorMsg struct {

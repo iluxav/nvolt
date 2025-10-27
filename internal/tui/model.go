@@ -16,14 +16,16 @@ type Model struct {
 	aclService     *services.ACLService
 
 	// Data
-	projectName    string
-	environments   []Environment
-	activeEnvIndex int
-	variables      []EnvVariable
-	users          []User
+	projects           []Project
+	activeProjectIndex int
+	environments       []Environment
+	activeEnvIndex     int
+	variables          []EnvVariable
+	users              []User
 
 	// UI state
 	focusedPanel    FocusedPanel
+	projectsCursor  int
 	variablesCursor int
 	usersCursor     int
 	showModal       ModalType
@@ -41,32 +43,29 @@ func NewModel(
 	aclService *services.ACLService,
 	projectName string,
 ) Model {
-	// Initialize with temporary default environment - will be replaced by real data
-	environments := []Environment{
-		{Name: "default", IsActive: true},
-	}
-
 	return Model{
-		machineConfig:   machineConfig,
-		secretsClient:   secretsClient,
-		aclService:      aclService,
-		projectName:     projectName,
-		environments:    environments,
-		activeEnvIndex:  0,
-		variables:       []EnvVariable{},
-		users:           []User{},
-		focusedPanel:    VariablesPanel,
-		variablesCursor: 0,
-		usersCursor:     0,
-		showModal:       NoModal,
-		loading:         true, // Start with loading state
+		machineConfig:      machineConfig,
+		secretsClient:      secretsClient,
+		aclService:         aclService,
+		projects:           []Project{},
+		activeProjectIndex: 0,
+		environments:       []Environment{},
+		activeEnvIndex:     0,
+		variables:          []EnvVariable{},
+		users:              []User{},
+		focusedPanel:       ProjectsPanel,
+		projectsCursor:     0,
+		variablesCursor:    0,
+		usersCursor:        0,
+		showModal:          NoModal,
+		loading:            true, // Start with loading state
 	}
 }
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
-	// Load environments first, then data will load when environments are ready
-	return m.loadEnvironments()
+	// Load projects first, which will load environments for the first project
+	return m.loadProjects()
 }
 
 // Update handles messages and updates the model
@@ -76,6 +75,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	case loadProjectsMsg:
+		// Projects have been loaded
+		if msg.err != nil {
+			m.loading = false
+			m.err = msg.err
+			return m, nil
+		}
+
+		// Update projects
+		m.projects = msg.projects
+		if len(m.projects) > 0 {
+			m.activeProjectIndex = 0
+			m.projectsCursor = 0
+
+			// Load environments for the first project
+			if len(m.projects[0].Environments) > 0 {
+				m.environments = make([]Environment, len(m.projects[0].Environments))
+				for i, envName := range m.projects[0].Environments {
+					m.environments[i] = Environment{
+						Name:     envName,
+						IsActive: i == 0,
+					}
+				}
+				m.activeEnvIndex = 0
+			}
+		}
+
+		// Now load data for the first project/environment
+		return m, m.loadData()
 
 	case loadEnvironmentsMsg:
 		// Environments have been loaded
@@ -114,9 +143,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Convert and update users
-		if msg.users != nil {
+		if msg.users != nil && len(m.projects) > 0 && len(m.environments) > 0 {
+			projectName := m.projects[m.activeProjectIndex].Name
 			envName := m.environments[m.activeEnvIndex].Name
-			m.users = convertToUsers(msg.users, m.projectName, envName)
+			m.users = convertToUsers(msg.users, projectName, envName)
 		}
 
 		// Reset cursors if needed
@@ -147,11 +177,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "tab":
-			// Switch between left and right panels
-			if m.focusedPanel == VariablesPanel {
-				m.focusedPanel = UsersPanel
-			} else {
+			// Cycle through panels: Projects -> Variables -> Users -> Projects
+			switch m.focusedPanel {
+			case ProjectsPanel:
 				m.focusedPanel = VariablesPanel
+			case VariablesPanel:
+				m.focusedPanel = UsersPanel
+			case UsersPanel:
+				m.focusedPanel = ProjectsPanel
 			}
 			return m, nil
 
@@ -178,11 +211,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "up", "k":
-			if m.focusedPanel == VariablesPanel {
+			switch m.focusedPanel {
+			case ProjectsPanel:
+				if m.projectsCursor > 0 {
+					m.projectsCursor--
+				}
+			case VariablesPanel:
 				if m.variablesCursor > 0 {
 					m.variablesCursor--
 				}
-			} else {
+			case UsersPanel:
 				if m.usersCursor > 0 {
 					m.usersCursor--
 				}
@@ -190,11 +228,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "down", "j":
-			if m.focusedPanel == VariablesPanel {
+			switch m.focusedPanel {
+			case ProjectsPanel:
+				if m.projectsCursor < len(m.projects)-1 {
+					m.projectsCursor++
+				}
+			case VariablesPanel:
 				if m.variablesCursor < len(m.variables)-1 {
 					m.variablesCursor++
 				}
-			} else {
+			case UsersPanel:
 				if m.usersCursor < len(m.users)-1 {
 					m.usersCursor++
 				}
@@ -202,8 +245,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "enter", " ":
-			// Toggle reveal/hide value for selected variable
-			if m.focusedPanel == VariablesPanel && len(m.variables) > 0 {
+			// Handle Enter based on focused panel
+			if m.focusedPanel == ProjectsPanel && len(m.projects) > 0 {
+				// Select project and reload environments and data
+				oldProjectIndex := m.activeProjectIndex
+				m.activeProjectIndex = m.projectsCursor
+
+				if oldProjectIndex != m.activeProjectIndex {
+					// Load environments for the new project
+					if len(m.projects[m.activeProjectIndex].Environments) > 0 {
+						m.environments = make([]Environment, len(m.projects[m.activeProjectIndex].Environments))
+						for i, envName := range m.projects[m.activeProjectIndex].Environments {
+							m.environments[i] = Environment{
+								Name:     envName,
+								IsActive: i == 0,
+							}
+						}
+						m.activeEnvIndex = 0
+					}
+
+					// Reload data for the new project
+					m.loading = true
+					m.variablesCursor = 0
+					m.usersCursor = 0
+					return m, m.loadData()
+				}
+				return m, nil
+
+			} else if m.focusedPanel == VariablesPanel && len(m.variables) > 0 {
+				// Toggle reveal/hide value for selected variable
 				m.variables[m.variablesCursor].IsRevealed = !m.variables[m.variablesCursor].IsRevealed
 			}
 			return m, nil
@@ -262,10 +332,12 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
-	// Calculate panel widths
-	panelWidth := (m.width - 6) / 2
+	// Calculate panel widths for 3 columns
+	projectsPanelWidth := m.width / 5              // 20% for projects
+	variablesPanelWidth := (m.width * 2) / 5       // 40% for variables
+	usersPanelWidth := (m.width * 2) / 5           // 40% for users
 
-	// Render header
+	// Render header (now simpler, without project/environment)
 	header := m.renderHeader()
 
 	// Render error banner if any
@@ -275,11 +347,12 @@ func (m Model) View() string {
 	}
 
 	// Render panels
-	leftPanel := m.renderVariablesPanel(panelWidth)
-	rightPanel := m.renderUsersPanel(panelWidth)
+	projectsPanel := m.renderProjectsPanel(projectsPanelWidth)
+	variablesPanel := m.renderVariablesPanel(variablesPanelWidth)
+	usersPanel := m.renderUsersPanel(usersPanelWidth)
 
 	// Combine panels side by side
-	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, projectsPanel, variablesPanel, usersPanel)
 
 	// Render help text
 	help := m.renderHelp()
@@ -316,23 +389,29 @@ func (m Model) renderHeader() string {
 	// Compact one-line logo
 	logo := renderCompactLogo()
 
-	// Project section - label and value aligned
+	// Project and environment info
+	var projectName, envName string
+	if len(m.projects) > 0 && m.activeProjectIndex < len(m.projects) {
+		projectName = m.projects[m.activeProjectIndex].Name
+	} else {
+		projectName = "Loading..."
+	}
+
+	if len(m.environments) > 0 && m.activeEnvIndex < len(m.environments) {
+		envName = m.environments[m.activeEnvIndex].Name
+	} else {
+		envName = "Loading..."
+	}
+
+	// Project section
 	projectLabel := headerStyle.Render("Project:")
-	projectTag := tagStyle.Render(m.projectName)
+	projectTag := tagStyle.Render(projectName)
 	projectSection := lipgloss.JoinHorizontal(lipgloss.Bottom, projectLabel, " ", projectTag)
 
-	// Environment section - label and values aligned
+	// Environment section
 	envLabel := headerStyle.Render("Environment:")
-	envTags := make([]string, len(m.environments))
-	for i, env := range m.environments {
-		if env.IsActive {
-			envTags[i] = tagStyle.Render(env.Name)
-		} else {
-			envTags[i] = dimTagStyle.Render(env.Name)
-		}
-	}
-	envTagsJoined := lipgloss.JoinHorizontal(lipgloss.Bottom, envTags...)
-	envSection := lipgloss.JoinHorizontal(lipgloss.Bottom, envLabel, " ", envTagsJoined)
+	envTag := tagStyle.Render(envName)
+	envSection := lipgloss.JoinHorizontal(lipgloss.Bottom, envLabel, " ", envTag)
 
 	// Combine all sections with proper spacing
 	content := lipgloss.JoinHorizontal(
@@ -359,14 +438,15 @@ func (m Model) renderHeader() string {
 
 // renderHelp renders help text at the bottom
 func (m Model) renderHelp() string {
-	helpText := "Use tab key to jump between the left and right sections | " +
-		"Navigate horizontally between Environment names with keys: Arrow Left and Arrow Right | " +
-		"Navigate vertically between Environment selection and variable rows with keys: Arrow Up and Arrow Down | " +
-		"By pressing delete on selected row Delete prompt should appear | " +
-		"Press Enter/Space to reveal/hide value | Press q to quit"
+	helpText := "Tab: Switch panels (Projects/Variables/Users) | " +
+		"↑/↓: Navigate items | " +
+		"Enter: Select project or reveal value | " +
+		"←/→: Switch environments | " +
+		"Delete: Remove item | " +
+		"q: Quit"
 
 	if m.err != nil {
-		helpText += " | Press Esc to dismiss error"
+		helpText += " | Esc: Dismiss error"
 	}
 
 	return helpStyle.Render(helpText)
