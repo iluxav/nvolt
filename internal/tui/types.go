@@ -64,7 +64,17 @@ const (
 	NoModal ModalType = iota
 	DeleteVariableModal
 	DeleteUserModal
+	EditUserPermissionsModal
 )
+
+// PermissionEditor represents the state of permission editing
+type PermissionEditor struct {
+	UserEmail              string
+	ProjectPermissions     types.Permission
+	EnvironmentPermissions types.Permission
+	FocusedSection         int // 0 = project permissions, 1 = environment permissions
+	FocusedPermission      int // 0 = read, 1 = write, 2 = delete
+}
 
 // Messages for Bubble Tea
 type loadDataMsg struct {

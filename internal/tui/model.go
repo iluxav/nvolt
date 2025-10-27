@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"iluxav/nvolt/internal/services"
+	"iluxav/nvolt/internal/types"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,17 +28,18 @@ type Model struct {
 	users              []User
 
 	// UI state
-	focusedPanel    FocusedPanel
-	activeTab       RightPanelTab
-	projectsCursor  int
-	variablesCursor int
-	usersCursor     int
-	showModal       ModalType
-	modalTarget     string // Name of the item to delete
-	width           int
-	height          int
-	err             error
-	loading         bool
+	focusedPanel     FocusedPanel
+	activeTab        RightPanelTab
+	projectsCursor   int
+	variablesCursor  int
+	usersCursor      int
+	showModal        ModalType
+	modalTarget      string // Name of the item to delete
+	permissionEditor PermissionEditor
+	width            int
+	height           int
+	err              error
+	loading          bool
 }
 
 // NewModel creates a new TUI model
@@ -331,6 +333,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					m.err = fmt.Errorf("failed to copy to clipboard: %w", err)
 				}
+			} else if m.focusedPanel == RightPanel && m.activeTab == UsersTab && len(m.users) > 0 {
+				// Open permission editor for selected user
+				selectedUser := m.users[m.usersCursor]
+				m.showModal = EditUserPermissionsModal
+
+				// Initialize permission editor with current user permissions
+				projectPerms := selectedUser.ProjectPermissions
+				if projectPerms == nil {
+					projectPerms = &types.Permission{Read: false, Write: false, Delete: false}
+				}
+				envPerms := selectedUser.EnvironmentPermissions
+				if envPerms == nil {
+					envPerms = &types.Permission{Read: false, Write: false, Delete: false}
+				}
+
+				m.permissionEditor = PermissionEditor{
+					UserEmail:              selectedUser.Email,
+					ProjectPermissions:     *projectPerms,
+					EnvironmentPermissions: *envPerms,
+					FocusedSection:         0,
+					FocusedPermission:      0,
+				}
 			}
 			return m, nil
 
@@ -354,6 +378,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleModalKeys handles keyboard input when a modal is shown
 func (m Model) handleModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle permission editor separately
+	if m.showModal == EditUserPermissionsModal {
+		return m.handlePermissionEditorKeys(msg)
+	}
+
 	switch msg.String() {
 	case "esc", "n":
 		// Cancel deletion
@@ -370,7 +399,17 @@ func (m Model) handleModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.variablesCursor--
 			}
 		} else if m.showModal == DeleteUserModal {
-			// Remove the user
+			// Remove the user from organization via API
+			orgID := m.machineConfig.Config.ActiveOrgID
+			err := m.aclService.RemoveUserFromOrg(orgID, m.modalTarget)
+			if err != nil {
+				m.err = fmt.Errorf("failed to remove user: %w", err)
+				m.showModal = NoModal
+				m.modalTarget = ""
+				return m, nil
+			}
+
+			// Remove from local list
 			m.users = append(m.users[:m.usersCursor], m.users[m.usersCursor+1:]...)
 			if m.usersCursor >= len(m.users) && m.usersCursor > 0 {
 				m.usersCursor--
@@ -378,6 +417,102 @@ func (m Model) handleModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.showModal = NoModal
 		m.modalTarget = ""
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// handlePermissionEditorKeys handles keyboard input in the permission editor modal
+func (m Model) handlePermissionEditorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		// Cancel editing
+		m.showModal = NoModal
+		return m, nil
+
+	case "tab":
+		// Switch between project and environment permissions sections
+		m.permissionEditor.FocusedSection = (m.permissionEditor.FocusedSection + 1) % 2
+		m.permissionEditor.FocusedPermission = 0 // Reset to first permission
+		return m, nil
+
+	case "up", "k":
+		// Navigate up in permissions
+		if m.permissionEditor.FocusedPermission > 0 {
+			m.permissionEditor.FocusedPermission--
+		}
+		return m, nil
+
+	case "down", "j":
+		// Navigate down in permissions
+		if m.permissionEditor.FocusedPermission < 2 { // 0=read, 1=write, 2=delete
+			m.permissionEditor.FocusedPermission++
+		}
+		return m, nil
+
+	case " ", "enter":
+		// Toggle the focused permission
+		if m.permissionEditor.FocusedSection == 0 {
+			// Project permissions
+			switch m.permissionEditor.FocusedPermission {
+			case 0:
+				m.permissionEditor.ProjectPermissions.Read = !m.permissionEditor.ProjectPermissions.Read
+			case 1:
+				m.permissionEditor.ProjectPermissions.Write = !m.permissionEditor.ProjectPermissions.Write
+			case 2:
+				m.permissionEditor.ProjectPermissions.Delete = !m.permissionEditor.ProjectPermissions.Delete
+			}
+		} else {
+			// Environment permissions
+			switch m.permissionEditor.FocusedPermission {
+			case 0:
+				m.permissionEditor.EnvironmentPermissions.Read = !m.permissionEditor.EnvironmentPermissions.Read
+			case 1:
+				m.permissionEditor.EnvironmentPermissions.Write = !m.permissionEditor.EnvironmentPermissions.Write
+			case 2:
+				m.permissionEditor.EnvironmentPermissions.Delete = !m.permissionEditor.EnvironmentPermissions.Delete
+			}
+		}
+		return m, nil
+
+	case "s", "ctrl+s":
+		// Save permissions to server
+		if len(m.projects) == 0 || len(m.environments) == 0 {
+			m.err = fmt.Errorf("no active project or environment")
+			m.showModal = NoModal
+			return m, nil
+		}
+
+		orgID := m.machineConfig.Config.ActiveOrgID
+		projectName := m.projects[m.activeProjectIndex].Name
+		envName := m.environments[m.activeEnvIndex].Name
+
+		req := &types.ModifyUserPermissionsRequest{
+			Email:                  m.permissionEditor.UserEmail,
+			ProjectName:            projectName,
+			Environment:            envName,
+			ProjectPermissions:     &m.permissionEditor.ProjectPermissions,
+			EnvironmentPermissions: &m.permissionEditor.EnvironmentPermissions,
+		}
+
+		_, err := m.aclService.ModifyUserPermissions(orgID, req)
+		if err != nil {
+			m.err = fmt.Errorf("failed to save permissions: %w", err)
+			m.showModal = NoModal
+			return m, nil
+		}
+
+		// Update the user in the users list locally
+		for i := range m.users {
+			if m.users[i].Email == m.permissionEditor.UserEmail {
+				m.users[i].ProjectPermissions = &m.permissionEditor.ProjectPermissions
+				m.users[i].EnvironmentPermissions = &m.permissionEditor.EnvironmentPermissions
+				break
+			}
+		}
+
+		m.showModal = NoModal
 		return m, nil
 	}
 
@@ -539,6 +674,10 @@ func (m Model) renderErrorBanner() string {
 
 // renderModal renders the delete confirmation modal
 func (m Model) renderModal() string {
+	if m.showModal == EditUserPermissionsModal {
+		return m.renderPermissionEditor()
+	}
+
 	var title string
 	if m.showModal == DeleteVariableModal {
 		title = fmt.Sprintf("Delete \"%s\"?", m.modalTarget)
@@ -553,6 +692,86 @@ func (m Model) renderModal() string {
 		dimTagStyle.Render("✕ Close with Esc"),
 		"",
 		"Press Y to confirm or N to cancel",
+	)
+
+	return modalStyle.Render(prompt)
+}
+
+// renderPermissionEditor renders the permission editing modal
+func (m Model) renderPermissionEditor() string {
+	title := fmt.Sprintf("Edit Permissions for %s", m.permissionEditor.UserEmail)
+
+	// Helper function to render a checkbox
+	checkbox := func(checked bool, focused bool) string {
+		box := "[ ]"
+		if checked {
+			box = "[✓]"
+		}
+		if focused {
+			return selectedRowStyle.Render(box)
+		}
+		return box
+	}
+
+	// Project permissions section
+	projectFocused := m.permissionEditor.FocusedSection == 0
+	projectTitle := "Project Permissions"
+	if projectFocused {
+		projectTitle = titleStyle.Render("▶ " + projectTitle)
+	} else {
+		projectTitle = dimTagStyle.Render("  " + projectTitle)
+	}
+
+	projectRead := checkbox(
+		m.permissionEditor.ProjectPermissions.Read,
+		projectFocused && m.permissionEditor.FocusedPermission == 0,
+	) + " Read"
+	projectWrite := checkbox(
+		m.permissionEditor.ProjectPermissions.Write,
+		projectFocused && m.permissionEditor.FocusedPermission == 1,
+	) + " Write"
+	projectDelete := checkbox(
+		m.permissionEditor.ProjectPermissions.Delete,
+		projectFocused && m.permissionEditor.FocusedPermission == 2,
+	) + " Delete"
+
+	// Environment permissions section
+	envFocused := m.permissionEditor.FocusedSection == 1
+	envTitle := "Environment Permissions"
+	if envFocused {
+		envTitle = titleStyle.Render("▶ " + envTitle)
+	} else {
+		envTitle = dimTagStyle.Render("  " + envTitle)
+	}
+
+	envRead := checkbox(
+		m.permissionEditor.EnvironmentPermissions.Read,
+		envFocused && m.permissionEditor.FocusedPermission == 0,
+	) + " Read"
+	envWrite := checkbox(
+		m.permissionEditor.EnvironmentPermissions.Write,
+		envFocused && m.permissionEditor.FocusedPermission == 1,
+	) + " Write"
+	envDelete := checkbox(
+		m.permissionEditor.EnvironmentPermissions.Delete,
+		envFocused && m.permissionEditor.FocusedPermission == 2,
+	) + " Delete"
+
+	prompt := lipgloss.JoinVertical(
+		lipgloss.Left,
+		headerStyle.Render(title),
+		"",
+		projectTitle,
+		"  " + projectRead,
+		"  " + projectWrite,
+		"  " + projectDelete,
+		"",
+		envTitle,
+		"  " + envRead,
+		"  " + envWrite,
+		"  " + envDelete,
+		"",
+		dimTagStyle.Render("Tab: Switch section | ↑/↓: Navigate | Space/Enter: Toggle | S: Save | Esc: Cancel"),
 	)
 
 	return modalStyle.Render(prompt)
