@@ -32,8 +32,8 @@ func formatPermissions(perms *types.Permission) string {
 	return strings.Join(parts, "|")
 }
 
-// renderUsersPanel renders the right panel with users
-func (m Model) renderUsersPanel(width int) string {
+// renderUsersContent renders the users table content (without panel wrapper)
+func (m Model) renderUsersContent(width int) string {
 	// Panel title with current project and environment
 	var projectName, envName string
 	if len(m.projects) > 0 {
@@ -49,8 +49,16 @@ func (m Model) renderUsersPanel(width int) string {
 	title := titleStyle.Render(fmt.Sprintf("Users in %s, %s", projectName, envName))
 
 	// Table headers
+	// Adjust to fit within panel width
 	headers := []string{"Name", "Email", "Project Perms", "Env Perms", "Org Role"}
-	headerWidths := []int{width / 4, width / 3, width / 7, width / 7, width / 10}
+	usableWidth := width - 6
+	headerWidths := []int{
+		usableWidth / 5,      // Name: 20%
+		usableWidth * 3 / 10, // Email: 30%
+		usableWidth / 6,      // Project Perms: ~17%
+		usableWidth / 6,      // Env Perms: ~17%
+		usableWidth / 6,      // Org Role: ~17%
+	}
 
 	headerRow := ""
 	for i, header := range headers {
@@ -61,7 +69,7 @@ func (m Model) renderUsersPanel(width int) string {
 	rows := []string{}
 	for i, user := range m.users {
 		// Determine if this row is selected
-		isSelected := i == m.usersCursor && m.focusedPanel == UsersPanel
+		isSelected := i == m.usersCursor && m.focusedPanel == RightPanel && m.activeTab == UsersTab
 
 		// Format project permissions
 		projectPerms := formatPermissions(user.ProjectPermissions)
@@ -97,20 +105,17 @@ func (m Model) renderUsersPanel(width int) string {
 		loadingText := infoStyle.Render("⏳ Loading...")
 		table = lipgloss.JoinVertical(lipgloss.Left, headerRow, "", loadingText)
 	} else {
-		table = lipgloss.JoinVertical(lipgloss.Left, headerRow)
+		// Add spacing after header
+		table = lipgloss.JoinVertical(lipgloss.Left, headerRow, "")
 		if len(rows) > 0 {
-			table = lipgloss.JoinVertical(lipgloss.Left, table, strings.Join(rows, "\n"))
+			// Add small vertical spacing between rows
+			table = lipgloss.JoinVertical(lipgloss.Left, table, strings.Join(rows, "\n\n"))
 		} else {
 			table = lipgloss.JoinVertical(lipgloss.Left, table, tableRowStyle.Render("No users found"))
 		}
 	}
 
-	// Build panel content
+	// Build content (no panel wrapper - that's handled by renderRightPanel)
 	content := lipgloss.JoinVertical(lipgloss.Left, title, "", table)
-
-	// Apply panel style based on focus
-	if m.focusedPanel == UsersPanel {
-		return activePanelStyle.Width(width).Height(m.height - 10).Render(content)
-	}
-	return panelStyle.Width(width).Height(m.height - 10).Render(content)
+	return content
 }

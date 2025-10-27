@@ -11,9 +11,9 @@ import (
 // Model is the main TUI model
 type Model struct {
 	// Services
-	machineConfig  *services.MachineConfig
-	secretsClient  *services.SecretsClient
-	aclService     *services.ACLService
+	machineConfig *services.MachineConfig
+	secretsClient *services.SecretsClient
+	aclService    *services.ACLService
 
 	// Data
 	projects           []Project
@@ -25,6 +25,7 @@ type Model struct {
 
 	// UI state
 	focusedPanel    FocusedPanel
+	activeTab       RightPanelTab
 	projectsCursor  int
 	variablesCursor int
 	usersCursor     int
@@ -54,6 +55,7 @@ func NewModel(
 		variables:          []EnvVariable{},
 		users:              []User{},
 		focusedPanel:       ProjectsPanel,
+		activeTab:          VariablesTab,
 		projectsCursor:     0,
 		variablesCursor:    0,
 		usersCursor:        0,
@@ -177,18 +179,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "tab":
-			// Cycle through panels: Projects -> Variables -> Users -> Projects
+			// Cycle through panels: Projects -> Right Panel (Variables/Users)
 			switch m.focusedPanel {
 			case ProjectsPanel:
-				m.focusedPanel = VariablesPanel
-			case VariablesPanel:
-				m.focusedPanel = UsersPanel
-			case UsersPanel:
+				m.focusedPanel = RightPanel
+			case RightPanel:
 				m.focusedPanel = ProjectsPanel
 			}
 			return m, nil
 
+		case "v":
+			// Direct shortcut to Variables tab
+			m.activeTab = VariablesTab
+			m.focusedPanel = RightPanel
+			return m, nil
+
+		case "u":
+			// Direct shortcut to Users tab
+			m.activeTab = UsersTab
+			m.focusedPanel = RightPanel
+			return m, nil
+
 		case "left", "right":
+			// When in right panel, switch between tabs
+			// Otherwise, navigate between environments
+			if m.focusedPanel == RightPanel {
+				if msg.String() == "left" {
+					m.activeTab = VariablesTab
+				} else {
+					m.activeTab = UsersTab
+				}
+				return m, nil
+			}
+
 			// Navigate between environments
 			oldIndex := m.activeEnvIndex
 			if msg.String() == "left" && m.activeEnvIndex > 0 {
@@ -216,13 +239,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.projectsCursor > 0 {
 					m.projectsCursor--
 				}
-			case VariablesPanel:
-				if m.variablesCursor > 0 {
-					m.variablesCursor--
-				}
-			case UsersPanel:
-				if m.usersCursor > 0 {
-					m.usersCursor--
+			case RightPanel:
+				// Navigate based on active tab
+				if m.activeTab == VariablesTab {
+					if m.variablesCursor > 0 {
+						m.variablesCursor--
+					}
+				} else {
+					if m.usersCursor > 0 {
+						m.usersCursor--
+					}
 				}
 			}
 			return m, nil
@@ -233,13 +259,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.projectsCursor < len(m.projects)-1 {
 					m.projectsCursor++
 				}
-			case VariablesPanel:
-				if m.variablesCursor < len(m.variables)-1 {
-					m.variablesCursor++
-				}
-			case UsersPanel:
-				if m.usersCursor < len(m.users)-1 {
-					m.usersCursor++
+			case RightPanel:
+				// Navigate based on active tab
+				if m.activeTab == VariablesTab {
+					if m.variablesCursor < len(m.variables)-1 {
+						m.variablesCursor++
+					}
+				} else {
+					if m.usersCursor < len(m.users)-1 {
+						m.usersCursor++
+					}
 				}
 			}
 			return m, nil
@@ -272,20 +301,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 
-			} else if m.focusedPanel == VariablesPanel && len(m.variables) > 0 {
+			} else if m.focusedPanel == RightPanel && m.activeTab == VariablesTab && len(m.variables) > 0 {
 				// Toggle reveal/hide value for selected variable
 				m.variables[m.variablesCursor].IsRevealed = !m.variables[m.variablesCursor].IsRevealed
 			}
 			return m, nil
 
 		case "delete", "d":
-			// Show delete modal
-			if m.focusedPanel == VariablesPanel && len(m.variables) > 0 {
-				m.showModal = DeleteVariableModal
-				m.modalTarget = m.variables[m.variablesCursor].Name
-			} else if m.focusedPanel == UsersPanel && len(m.users) > 0 {
-				m.showModal = DeleteUserModal
-				m.modalTarget = m.users[m.usersCursor].Email
+			// Show delete modal based on active tab
+			if m.focusedPanel == RightPanel {
+				if m.activeTab == VariablesTab && len(m.variables) > 0 {
+					m.showModal = DeleteVariableModal
+					m.modalTarget = m.variables[m.variablesCursor].Name
+				} else if m.activeTab == UsersTab && len(m.users) > 0 {
+					m.showModal = DeleteUserModal
+					m.modalTarget = m.users[m.usersCursor].Email
+				}
 			}
 			return m, nil
 		}
@@ -332,12 +363,12 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
-	// Calculate panel widths for 3 columns
-	projectsPanelWidth := m.width / 5              // 20% for projects
-	variablesPanelWidth := (m.width * 2) / 5       // 40% for variables
-	usersPanelWidth := (m.width * 2) / 5           // 40% for users
+	// Calculate panel widths for 2 columns
+	// Account for borders and padding between panels
+	projectsPanelWidth := m.width / 6                   // ~17% for projects
+	rightPanelWidth := m.width - projectsPanelWidth - 6 // Remaining width minus borders/padding
 
-	// Render header (now simpler, without project/environment)
+	// Render header
 	header := m.renderHeader()
 
 	// Render error banner if any
@@ -348,11 +379,10 @@ func (m Model) View() string {
 
 	// Render panels
 	projectsPanel := m.renderProjectsPanel(projectsPanelWidth)
-	variablesPanel := m.renderVariablesPanel(variablesPanelWidth)
-	usersPanel := m.renderUsersPanel(usersPanelWidth)
+	rightPanel := m.renderRightPanel(rightPanelWidth)
 
 	// Combine panels side by side
-	panels := lipgloss.JoinHorizontal(lipgloss.Top, projectsPanel, variablesPanel, usersPanel)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, projectsPanel, rightPanel)
 
 	// Render help text
 	help := m.renderHelp()
@@ -438,10 +468,11 @@ func (m Model) renderHeader() string {
 
 // renderHelp renders help text at the bottom
 func (m Model) renderHelp() string {
-	helpText := "Tab: Switch panels (Projects/Variables/Users) | " +
+	helpText := "Tab: Switch panels | " +
+		"v/u: Jump to Variables/Users | " +
+		"←/→: Switch tabs (in right panel) or environments | " +
 		"↑/↓: Navigate items | " +
 		"Enter: Select project or reveal value | " +
-		"←/→: Switch environments | " +
 		"Delete: Remove item | " +
 		"q: Quit"
 

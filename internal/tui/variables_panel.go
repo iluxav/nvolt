@@ -6,14 +6,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderVariablesPanel renders the left panel with environment variables
-func (m Model) renderVariablesPanel(width int) string {
+// renderVariablesContent renders the variables table content (without panel wrapper)
+func (m Model) renderVariablesContent(width int) string {
 	// Panel title
 	title := titleStyle.Render("Environment Variables")
 
 	// Table headers with creation date
+	// Adjust widths: smaller created date, more space for name and value
 	headers := []string{"Variable Name", "Value", "Created"}
-	headerWidths := []int{width * 3 / 10, width * 5 / 10, width * 2 / 10}
+	headerWidths := []int{(width - 6) * 3 / 10, (width - 6) * 5 / 10, (width - 6) * 2 / 10}
 
 	headerRow := ""
 	for i, header := range headers {
@@ -24,7 +25,7 @@ func (m Model) renderVariablesPanel(width int) string {
 	rows := []string{}
 	for i, variable := range m.variables {
 		// Determine if this row is selected
-		isSelected := i == m.variablesCursor && m.focusedPanel == VariablesPanel
+		isSelected := i == m.variablesCursor && m.focusedPanel == RightPanel && m.activeTab == VariablesTab
 
 		// Show actual decrypted value
 		value := variable.Value
@@ -59,20 +60,17 @@ func (m Model) renderVariablesPanel(width int) string {
 		loadingText := infoStyle.Render("⏳ Loading...")
 		table = lipgloss.JoinVertical(lipgloss.Left, headerRow, "", loadingText)
 	} else {
-		table = lipgloss.JoinVertical(lipgloss.Left, headerRow)
+		// Add spacing after header
+		table = lipgloss.JoinVertical(lipgloss.Left, headerRow, "")
 		if len(rows) > 0 {
-			table = lipgloss.JoinVertical(lipgloss.Left, table, strings.Join(rows, "\n"))
+			// Add small vertical spacing between rows
+			table = lipgloss.JoinVertical(lipgloss.Left, table, strings.Join(rows, "\n\n"))
 		} else {
 			table = lipgloss.JoinVertical(lipgloss.Left, table, tableRowStyle.Render("No variables found"))
 		}
 	}
 
-	// Build panel content
+	// Build content (no panel wrapper - that's handled by renderRightPanel)
 	content := lipgloss.JoinVertical(lipgloss.Left, title, "", table)
-
-	// Apply panel style based on focus
-	if m.focusedPanel == VariablesPanel {
-		return activePanelStyle.Width(width).Height(m.height - 10).Render(content)
-	}
-	return panelStyle.Width(width).Height(m.height - 10).Render(content)
+	return content
 }

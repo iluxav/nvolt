@@ -10,8 +10,15 @@ type FocusedPanel int
 
 const (
 	ProjectsPanel FocusedPanel = iota
-	VariablesPanel
-	UsersPanel
+	RightPanel // Combined Variables/Users panel
+)
+
+// RightPanelTab represents the active tab in the right panel
+type RightPanelTab int
+
+const (
+	VariablesTab RightPanelTab = iota
+	UsersTab
 )
 
 // Project represents a project with its environments
