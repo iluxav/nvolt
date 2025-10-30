@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"iluxav/nvolt/internal/helpers"
 	"iluxav/nvolt/internal/types"
+
+	"github.com/AlecAivazis/survey/v2"
 )
 
 type ACLService struct {
@@ -163,4 +165,71 @@ func (s *ACLService) ModifyUserPermissions(orgID string, req *types.ModifyUserPe
 	}
 
 	return response, nil
+}
+
+// ResolveOrgID smartly resolves which org to use based on user's orgs and active_org_id
+// Returns: (orgID, orgName, shouldSave, error)
+// - If user has 1 org: auto-select it, don't save as default
+// - If user has multiple orgs + active_org_id set: use it
+// - If user has multiple orgs + no active_org_id: prompt user and ask if they want to set as default
+func (s *ACLService) ResolveOrgID(machineConfig *MachineConfig) (string, string, bool, error) {
+	// Fetch all user orgs
+	userOrgs, err := s.GetUserOrgs()
+	if err != nil {
+		return "", "", false, fmt.Errorf("failed to fetch organizations: %w", err)
+	}
+
+	if len(userOrgs) == 0 {
+		return "", "", false, fmt.Errorf("user has no organizations")
+	}
+
+	// Case 1: User has only one org - auto-select it (no prompt, no save)
+	if len(userOrgs) == 1 {
+		return userOrgs[0].OrgID, userOrgs[0].Org.Name, false, nil
+	}
+
+	// Case 2: Multiple orgs + active_org_id is set - use it
+	if machineConfig.Config.ActiveOrgID != "" {
+		// Verify the active org still exists
+		for _, org := range userOrgs {
+			if org.OrgID == machineConfig.Config.ActiveOrgID {
+				return org.OrgID, org.Org.Name, false, nil
+			}
+		}
+		// If active_org_id doesn't exist anymore, fall through to prompt
+		fmt.Println("⚠ Your default organization no longer exists. Please select a new one.")
+	}
+
+	// Case 3: Multiple orgs + no active_org_id - prompt user
+	orgNames := make([]string, len(userOrgs))
+	orgMap := make(map[string]*types.OrgUser)
+	for i, org := range userOrgs {
+		displayName := fmt.Sprintf("%s (%s)", org.Org.Name, org.Role)
+		orgNames[i] = displayName
+		orgMap[displayName] = org
+	}
+
+	var selectedOrgName string
+	prompt := &survey.Select{
+		Message: "Select an organization:",
+		Options: orgNames,
+	}
+	if err := survey.AskOne(prompt, &selectedOrgName); err != nil {
+		return "", "", false, fmt.Errorf("organization selection cancelled")
+	}
+
+	selectedOrg := orgMap[selectedOrgName]
+
+	// Ask if user wants to set as default
+	var setAsDefault bool
+	confirmPrompt := &survey.Confirm{
+		Message: "Set this organization as default? (You won't be prompted again)",
+		Default: false,
+	}
+	if err := survey.AskOne(confirmPrompt, &setAsDefault); err != nil {
+		// If they cancel, just continue without setting default
+		setAsDefault = false
+	}
+
+	return selectedOrg.OrgID, selectedOrg.Org.Name, setAsDefault, nil
 }

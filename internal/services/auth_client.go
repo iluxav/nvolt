@@ -22,11 +22,14 @@ func NewAuthClient(config *types.MachineLocalConfig) *AuthClient {
 }
 
 // RequestChallenge requests an encrypted challenge from server
-func (a *AuthClient) RequestChallenge(machineName string) (string, string, error) {
+func (a *AuthClient) RequestChallenge(machineName string, orgID string) (string, string, error) {
 
 	url := fmt.Sprintf("%s/api/v1/auth/challenge", a.config.ServerURL)
 
-	req := map[string]string{"machine_name": machineName}
+	req := map[string]string{
+		"machine_name": machineName,
+		"org_id":       orgID,
+	}
 	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req, a.config.MachineID)
 	if err != nil {
 		return "", "", err
@@ -76,13 +79,14 @@ func (a *AuthClient) SignChallenge(privateKeyPEM, encryptedChallenge string) (st
 }
 
 // VerifySignature sends signature to server and gets JWT
-func (a *AuthClient) VerifySignature(machineName, challengeID, signature string) (string, error) {
+func (a *AuthClient) VerifySignature(machineName, challengeID, signature string, orgID string) (string, error) {
 	url := fmt.Sprintf("%s/api/v1/auth/verify", a.config.ServerURL)
 
 	req := map[string]string{
 		"machine_name": machineName,
 		"challenge_id": challengeID,
 		"signature":    signature,
+		"org_id":       orgID,
 	}
 
 	resp, err := helpers.CallAPIWithPayload[map[string]interface{}](url, "POST", "", &req, a.config.MachineID)

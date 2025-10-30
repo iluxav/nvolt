@@ -38,7 +38,6 @@ type AddUserToOrgRequest struct {
 	Email                  string      `json:"email"`
 	ProjectName            string      `json:"project_name,omitempty"`
 	Environment            string      `json:"environment,omitempty"`
-	ProjectPermissions     *Permission `json:"project_permissions,omitempty"`
 	EnvironmentPermissions *Permission `json:"environment_permissions,omitempty"`
 }
 
@@ -57,7 +56,6 @@ type ModifyUserPermissionsRequest struct {
 	Role                   string      `json:"role,omitempty"`
 	ProjectName            string      `json:"project_name,omitempty"`
 	Environment            string      `json:"environment,omitempty"`
-	ProjectPermissions     *Permission `json:"project_permissions,omitempty"`
 	EnvironmentPermissions *Permission `json:"environment_permissions,omitempty"`
 }
 
@@ -77,10 +75,9 @@ type UserPermissions struct {
 	User        *User               `json:"user,omitempty"`
 }
 
-// ProjectPermission represents permissions for a specific project
+// ProjectPermission represents all environments a user has access to within a project
 type ProjectPermission struct {
 	ProjectName     string                  `json:"project_name"`
-	Permissions     Permission              `json:"permissions"`
 	Environments    []EnvironmentPermission `json:"environments"`     // Environments the user has access to
 	AllEnvironments []string                `json:"all_environments"` // All environments that exist for this project
 }

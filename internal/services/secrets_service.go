@@ -98,11 +98,59 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		}
 	}
 
-	// Step 3: Generate a NEW master key for encryption (key rotation on every push)
-	masterKey, err := crypto.GenerateMasterKey()
-	if err != nil {
-		return fmt.Errorf("failed to generate master key: %w", err)
+	// Step 3: Get or generate the org-level master key
+	// With org-level wrapped keys, we MUST reuse the same master key for all projects/environments
+	var masterKey []byte
+
+	// Try to fetch existing org master key from the current project/environment first
+	pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
+		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(projectName), url.PathEscape(environment), currentMachineKeyID)
+	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+
+	if err == nil && pullResp.WrappedKey != "" {
+		// Existing org master key found - unwrap and reuse it
+		privateKey, err := s.machineConfig.GetPrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to get private key: %w", err)
+		}
+		masterKey, err = crypto.UnwrapMasterKey(privateKey, pullResp.WrappedKey)
+		if err != nil {
+			return fmt.Errorf("failed to unwrap org master key: %w", err)
+		}
+		fmt.Println("Reusing existing org-level master key")
+	} else {
+		// No master key found - try to fetch from any other project/environment in the org
+		projectEnvs, err := s.GetProjectEnvironments(orgID)
+		if err == nil && len(projectEnvs) > 0 {
+			// Try the first available project/environment
+			firstPE := projectEnvs[0]
+			pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
+				s.machineConfig.Config.ServerURL, orgID, url.PathEscape(firstPE.ProjectName), url.PathEscape(firstPE.Environment), currentMachineKeyID)
+			pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+
+			if err == nil && pullResp.WrappedKey != "" {
+				privateKey, err := s.machineConfig.GetPrivateKey()
+				if err != nil {
+					return fmt.Errorf("failed to get private key: %w", err)
+				}
+				masterKey, err = crypto.UnwrapMasterKey(privateKey, pullResp.WrappedKey)
+				if err != nil {
+					return fmt.Errorf("failed to unwrap org master key: %w", err)
+				}
+				fmt.Printf("Reusing org master key from %s/%s\n", firstPE.ProjectName, firstPE.Environment)
+			}
+		}
+
+		// Still no master key? Generate a new one (first push ever in this org)
+		if masterKey == nil {
+			masterKey, err = crypto.GenerateMasterKey()
+			if err != nil {
+				return fmt.Errorf("failed to generate master key: %w", err)
+			}
+			fmt.Println("Generated new org-level master key (first push in this org)")
+		}
 	}
+
 	defer func() {
 		// Clear master key from memory
 		for i := range masterKey {
@@ -110,7 +158,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		}
 	}()
 
-	// Step 4: Wrap the NEW master key with each machine's public key
+	// Step 4: Wrap the org master key with each machine's public key
 	wrappedKeys := make(map[string]string)
 	for _, machine := range machinesResp.Machines {
 		wrappedKey, err := crypto.WrapMasterKey(machine.PublicKey, masterKey)
@@ -126,7 +174,7 @@ func (s *SecretsClient) PushSecrets(projectName, environment string, variables m
 		return fmt.Errorf("failed to wrap master key for any machines")
 	}
 
-	// Step 5: Encrypt ALL variables (existing + new) with the NEW master key
+	// Step 5: Encrypt ALL variables (existing + new) with the org master key
 	encryptedVars := make(map[string]string)
 	for key, value := range varsToEncrypt {
 		encryptedValue, err := crypto.EncryptWithMasterKey(masterKey, value)
@@ -214,6 +262,11 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 		return nil, fmt.Errorf("failed to pull secrets: %w", err)
 	}
 
+	// If no wrapped key, it means no secrets have been pushed yet - return empty map
+	if pullResp.WrappedKey == "" {
+		return make(map[string]string), nil
+	}
+
 	// Unwrap the master key using machine's private key
 	privateKey, err := s.machineConfig.GetPrivateKey()
 	if err != nil {
@@ -245,6 +298,113 @@ func (s *SecretsClient) PullSecrets(projectName, environment, specificKey string
 
 // SyncKeys re-wraps the master key for all machines in the org without modifying secrets
 // This is useful after adding a new machine to enable it to access existing secrets
+// SyncOrgKeys synchronizes the org-level master key across all machines
+// This is the new simplified approach where one master key is used for the entire org
+func (s *SecretsClient) SyncOrgKeys(orgID string) error {
+	// Step 1: Fetch all machines for the org
+	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
+	machinesResp, err := helpers.CallAPI[types.GetMachinesResponseDTO](machinesURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch machines: %w", err)
+	}
+
+	// Get current machine key ID
+	var currentMachineKeyID string
+	for _, machine := range machinesResp.Machines {
+		if machine.MachineID == s.machineConfig.Config.MachineID {
+			currentMachineKeyID = machine.ID
+			break
+		}
+	}
+
+	if currentMachineKeyID == "" {
+		return fmt.Errorf("current machine not found in authorized machines")
+	}
+
+	// Step 2: Find any project/environment to fetch the org's master key
+	projectEnvs, err := s.GetProjectEnvironments(orgID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch project environments: %w", err)
+	}
+
+	if len(projectEnvs) == 0 {
+		return fmt.Errorf("no secrets found in organization. Nothing to sync")
+	}
+
+	// Use the first project/environment to fetch the master key
+	firstPE := projectEnvs[0]
+	fmt.Printf("Fetching org master key from %s/%s...\n", firstPE.ProjectName, firstPE.Environment)
+
+	pullURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets?machine_key_id=%s",
+		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(firstPE.ProjectName), url.PathEscape(firstPE.Environment), currentMachineKeyID)
+
+	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch master key: %w", err)
+	}
+
+	if pullResp.WrappedKey == "" {
+		return fmt.Errorf("no wrapped key found. This machine may not have been synced yet")
+	}
+
+	// Step 3: Unwrap the org's master key
+	privateKey, err := s.machineConfig.GetPrivateKey()
+	if err != nil {
+		return fmt.Errorf("failed to get private key: %w", err)
+	}
+	masterKey, err := crypto.UnwrapMasterKey(privateKey, pullResp.WrappedKey)
+	if err != nil {
+		return fmt.Errorf("failed to unwrap master key: %w", err)
+	}
+	defer func() {
+		// Clear master key from memory
+		for i := range masterKey {
+			masterKey[i] = 0
+		}
+	}()
+
+	// Step 4: Re-wrap the master key for ALL machines (including newly added ones)
+	wrappedKeys := make(map[string]string)
+	for _, machine := range machinesResp.Machines {
+		wrappedKey, err := crypto.WrapMasterKey(machine.PublicKey, masterKey)
+		if err != nil {
+			fmt.Printf("Warning: Failed to wrap key for machine %s: %v\n", machine.Name, err)
+			continue
+		}
+		wrappedKeys[machine.ID] = wrappedKey
+	}
+
+	if len(wrappedKeys) == 0 {
+		return fmt.Errorf("failed to wrap master key for any machines")
+	}
+
+	fmt.Printf("Re-wrapped org master key for %d machine(s)\n", len(wrappedKeys))
+
+	// Step 5: Upload the wrapped keys back to the server
+	// We use any project/environment just to trigger the wrapped key update
+	existingVars := make(map[string]string)
+	for key, varMeta := range pullResp.Variables {
+		existingVars[key] = varMeta.Value
+	}
+
+	pushURL := fmt.Sprintf("%s/api/v1/organizations/%s/projects/%s/environments/%s/secrets",
+		s.machineConfig.Config.ServerURL, orgID, url.PathEscape(firstPE.ProjectName), url.PathEscape(firstPE.Environment))
+	requestDTO := types.PushSecretsRequestDTO{
+		Variables:    existingVars, // Reuse existing encrypted variables
+		WrappedKeys:  wrappedKeys,  // New wrapped keys for all machines
+		ReplaceAll:   true,
+		MachineKeyID: currentMachineKeyID,
+	}
+
+	_, err = helpers.CallAPIWithPayload[types.PushSecretsResponseDTO](pushURL, "POST", s.machineConfig.Config.JWT_Token, &requestDTO, s.machineConfig.Config.MachineID)
+	if err != nil {
+		return fmt.Errorf("failed to upload wrapped keys: %w", err)
+	}
+
+	return nil
+}
+
+// SyncKeys is the old per-project/environment sync (deprecated but kept for compatibility)
 func (s *SecretsClient) SyncKeys(orgID string, projectName string, environment string) error {
 	// Step 1: Fetch all machines for the org
 	machinesURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.machineConfig.Config.ServerURL, orgID)
@@ -370,6 +530,11 @@ func (s *SecretsClient) PullSecretsWithMetadata(projectName, environment string)
 	pullResp, err := helpers.CallAPI[types.PullSecretsResponseDTO](pullURL, "GET", s.machineConfig.Config.JWT_Token, s.machineConfig.Config.MachineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull secrets: %w", err)
+	}
+
+	// If no wrapped key, it means no secrets have been pushed yet - return empty map
+	if pullResp.WrappedKey == "" {
+		return make(map[string]types.VariableWithMetadata), nil
 	}
 
 	// Unwrap the master key using machine's private key

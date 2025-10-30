@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"iluxav/nvolt/internal/helpers"
 	"iluxav/nvolt/internal/services"
 	"iluxav/nvolt/internal/types"
 	"os"
@@ -91,36 +90,26 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 }
 
-// resolveAndSetActiveOrg resolves the active organization based on the logic:
-// 1. If user has only one org, use it
-// 2. If user has multiple orgs and active_org is set, use it
-// 3. If user has multiple orgs and no active_org, show interactive selector
+// resolveAndSetActiveOrg resolves the active organization using the NEW smart logic:
+// 1. If user has only one org → auto-select it (no prompt, no save)
+// 2. If user has multiple orgs + active_org_id set → use it
+// 3. If user has multiple orgs + no active_org_id → prompt user + ask to set as default
 func resolveAndSetActiveOrg(machineConfig *services.MachineConfig, aclService *services.ACLService) error {
-	// Fetch user organizations
-	userOrgs, err := aclService.GetUserOrgs()
-	if err != nil {
-		return fmt.Errorf("failed to fetch organizations: %w", err)
-	}
-
-	if len(userOrgs) == 0 {
-		return fmt.Errorf("user does not belong to any organization")
-	}
-
-	// Store fetched orgs in MachineConfig for later use
-	machineConfig.OrgUsers = userOrgs
-
-	// Resolve active org
-	activeOrgID, err := helpers.ResolveActiveOrg(userOrgs, machineConfig.Config.ActiveOrgID)
+	// Use the new smart org resolver
+	orgID, orgName, shouldSave, err := aclService.ResolveOrgID(machineConfig)
 	if err != nil {
 		return err
 	}
 
-	// Save if it's different from current or not set
-	if machineConfig.Config.ActiveOrgID != activeOrgID {
-		err = machineConfig.SaveActiveOrg(activeOrgID)
-		if err != nil {
-			return fmt.Errorf("failed to save active organization: %w", err)
+	// Set the active org (in memory for this session)
+	machineConfig.Config.ActiveOrgID = orgID
+
+	// Only save to disk if user chose to set as default
+	if shouldSave {
+		if err := machineConfig.SaveActiveOrg(orgID); err != nil {
+			return fmt.Errorf("failed to save default organization: %w", err)
 		}
+		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Set '%s' as default organization", orgName)))
 	}
 
 	return nil

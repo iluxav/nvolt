@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iluxav/nvolt/internal/helpers"
 	"iluxav/nvolt/internal/services"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -87,6 +88,15 @@ func runPush(machineConfig *services.MachineConfig, aclService *services.ACLServ
 
 	err = secretsClient.PushSecrets(machineConfig.GetProject(), machineConfig.GetEnvironment(), vars, replaceAll)
 	if err != nil {
+		// Check if it's a permission error (403 Forbidden)
+		if strings.Contains(err.Error(), "status: 403") || strings.Contains(err.Error(), "Forbidden") {
+			fmt.Println("\n" + warnStyle.Render("⚠ Permission Denied"))
+			fmt.Println(infoStyle.Render("\nYou don't have write permission for this environment."))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Project: %s", machineConfig.GetProject())))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Environment: %s", machineConfig.GetEnvironment())))
+			fmt.Println(infoStyle.Render("\nPlease contact your organization admin to grant you access."))
+			return nil
+		}
 		return err
 	}
 

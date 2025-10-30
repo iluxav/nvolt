@@ -17,17 +17,17 @@ var userAddCmd = &cobra.Command{
 Only users with admin role can execute this command.
 
 Examples:
-  # Add user with default permissions
+  # Add user with default permissions (no project/env access)
   nvolt user add john@example.com
 
-  # Add user with project permissions
-  nvolt user add john@example.com -p my-project -pp read=true,write=true,delete=false
+  # Add user with environment permissions
+  nvolt user add john@example.com -p my-project -e production -pe read=true,write=false
 
-  # Add user with project and environment permissions
-  nvolt user add john@example.com -p my-project -e production -pp read=true,write=true -pe read=true,write=false
+  # Add user with interactive permission selection
+  nvolt user add john@example.com -p my-project -e production
 
   # Add user to a specific organization
-  nvolt user add john@example.com -o org-id-123
+  nvolt user add john@example.com -o org-id-123 -p my-project -e staging -pe read=true,write=true,delete=false
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,7 +35,6 @@ Examples:
 		project, _ := cmd.Flags().GetString("project")
 		environment, _ := cmd.Flags().GetString("environment")
 		orgID, _ := cmd.Flags().GetString("org")
-		projectPerms, _ := cmd.Flags().GetString("project-permissions")
 		envPerms, _ := cmd.Flags().GetString("environment-permissions")
 
 		machineConfig := services.MachineConfigFromContext(cmd.Context())
@@ -71,7 +70,7 @@ Examples:
 		}
 		machineConfig.TryOverrideWithFlags(project, environment)
 
-		return runUserAdd(aclService, secretsClient, targetOrgID, email, machineConfig.GetProject(), machineConfig.GetEnvironment(), projectPerms, envPerms)
+		return runUserAdd(aclService, secretsClient, targetOrgID, email, machineConfig.GetProject(), machineConfig.GetEnvironment(), envPerms)
 	},
 }
 
@@ -85,42 +84,17 @@ func init() {
 	userCmd.AddCommand(userAddCmd)
 
 	userAddCmd.Flags().StringP("org", "o", "", "Organization ID (defaults to active org)")
-	userAddCmd.Flags().StringP("project", "p", "", "Project name")
-	userAddCmd.Flags().StringP("environment", "e", "", "Environment name")
-	userAddCmd.Flags().StringP("project-permissions", "", "", "Project permissions (e.g., read=true,write=false,delete=false)")
-	userAddCmd.Flags().StringP("environment-permissions", "", "", "Environment permissions (e.g., read=true,write=false,delete=false)")
+	userAddCmd.Flags().StringP("project", "p", "", "Project name (required with -e)")
+	userAddCmd.Flags().StringP("environment", "e", "", "Environment name (required with -p)")
+	userAddCmd.Flags().StringP("environment-permissions", "a", "", "Environment permissions (e.g., read=true,write=false,delete=false)")
 
 	rootCmd.AddCommand(userCmd)
 }
 
-func runUserAdd(aclService *services.ACLService, secretsClient *services.SecretsClient, orgID, email, project, environment, projectPermsStr, envPermsStr string) error {
+func runUserAdd(aclService *services.ACLService, secretsClient *services.SecretsClient, orgID, email, project, environment, envPermsStr string) error {
 	fmt.Println(titleStyle.Render("Adding User to Organization"))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Email: %s", email)))
 	fmt.Println(infoStyle.Render(fmt.Sprintf("→ Organization ID: %s", orgID)))
-
-	// Parse or prompt for project permissions
-	var projectPermissions *types.Permission
-	if project != "" {
-		if projectPermsStr != "" {
-			// Parse from flag
-			perms, err := parsePermissions(projectPermsStr)
-			if err != nil {
-				return fmt.Errorf("invalid project permissions: %w", err)
-			}
-			projectPermissions = perms
-		} else {
-			// Interactive selector
-			fmt.Println(infoStyle.Render(fmt.Sprintf("\n→ Project: %s", project)))
-			perms, err := promptForPermissions("Project Permissions")
-			if err != nil {
-				return err
-			}
-			projectPermissions = perms
-		}
-
-		fmt.Println(infoStyle.Render(fmt.Sprintf("  Permissions: read=%t, write=%t, delete=%t",
-			projectPermissions.Read, projectPermissions.Write, projectPermissions.Delete)))
-	}
 
 	// Parse or prompt for environment permissions
 	var envPermissions *types.Permission
@@ -156,7 +130,6 @@ func runUserAdd(aclService *services.ACLService, secretsClient *services.Secrets
 		Email:                  email,
 		ProjectName:            project,
 		Environment:            environment,
-		ProjectPermissions:     projectPermissions,
 		EnvironmentPermissions: envPermissions,
 	}
 

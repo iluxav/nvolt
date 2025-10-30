@@ -54,6 +54,15 @@ func runWithSecrets(machineConfig *services.MachineConfig, command string) error
 
 	vars, err := secretsClient.PullSecrets(machineConfig.GetProject(), machineConfig.GetEnvironment(), "")
 	if err != nil {
+		// Check if it's a permission error (403 Forbidden)
+		if strings.Contains(err.Error(), "status: 403") || strings.Contains(err.Error(), "Forbidden") {
+			fmt.Println("\n" + warnStyle.Render("⚠ Permission Denied"))
+			fmt.Println(infoStyle.Render("\nYou don't have read permission for this environment."))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Project: %s", machineConfig.GetProject())))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Environment: %s", machineConfig.GetEnvironment())))
+			fmt.Println(infoStyle.Render("\nPlease contact your organization admin to grant you access."))
+			return nil
+		}
 		return fmt.Errorf("failed to pull secrets: %w", err)
 	}
 

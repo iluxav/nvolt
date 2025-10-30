@@ -339,10 +339,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showModal = EditUserPermissionsModal
 
 				// Initialize permission editor with current user permissions
-				projectPerms := selectedUser.ProjectPermissions
-				if projectPerms == nil {
-					projectPerms = &types.Permission{Read: false, Write: false, Delete: false}
-				}
 				envPerms := selectedUser.EnvironmentPermissions
 				if envPerms == nil {
 					envPerms = &types.Permission{Read: false, Write: false, Delete: false}
@@ -350,9 +346,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				m.permissionEditor = PermissionEditor{
 					UserEmail:              selectedUser.Email,
-					ProjectPermissions:     *projectPerms,
 					EnvironmentPermissions: *envPerms,
-					FocusedSection:         0,
 					FocusedPermission:      0,
 				}
 			}
@@ -431,12 +425,6 @@ func (m Model) handlePermissionEditorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showModal = NoModal
 		return m, nil
 
-	case "tab":
-		// Switch between project and environment permissions sections
-		m.permissionEditor.FocusedSection = (m.permissionEditor.FocusedSection + 1) % 2
-		m.permissionEditor.FocusedPermission = 0 // Reset to first permission
-		return m, nil
-
 	case "up", "k":
 		// Navigate up in permissions
 		if m.permissionEditor.FocusedPermission > 0 {
@@ -453,26 +441,13 @@ func (m Model) handlePermissionEditorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case " ", "enter":
 		// Toggle the focused permission
-		if m.permissionEditor.FocusedSection == 0 {
-			// Project permissions
-			switch m.permissionEditor.FocusedPermission {
-			case 0:
-				m.permissionEditor.ProjectPermissions.Read = !m.permissionEditor.ProjectPermissions.Read
-			case 1:
-				m.permissionEditor.ProjectPermissions.Write = !m.permissionEditor.ProjectPermissions.Write
-			case 2:
-				m.permissionEditor.ProjectPermissions.Delete = !m.permissionEditor.ProjectPermissions.Delete
-			}
-		} else {
-			// Environment permissions
-			switch m.permissionEditor.FocusedPermission {
-			case 0:
-				m.permissionEditor.EnvironmentPermissions.Read = !m.permissionEditor.EnvironmentPermissions.Read
-			case 1:
-				m.permissionEditor.EnvironmentPermissions.Write = !m.permissionEditor.EnvironmentPermissions.Write
-			case 2:
-				m.permissionEditor.EnvironmentPermissions.Delete = !m.permissionEditor.EnvironmentPermissions.Delete
-			}
+		switch m.permissionEditor.FocusedPermission {
+		case 0:
+			m.permissionEditor.EnvironmentPermissions.Read = !m.permissionEditor.EnvironmentPermissions.Read
+		case 1:
+			m.permissionEditor.EnvironmentPermissions.Write = !m.permissionEditor.EnvironmentPermissions.Write
+		case 2:
+			m.permissionEditor.EnvironmentPermissions.Delete = !m.permissionEditor.EnvironmentPermissions.Delete
 		}
 		return m, nil
 
@@ -492,7 +467,6 @@ func (m Model) handlePermissionEditorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Email:                  m.permissionEditor.UserEmail,
 			ProjectName:            projectName,
 			Environment:            envName,
-			ProjectPermissions:     &m.permissionEditor.ProjectPermissions,
 			EnvironmentPermissions: &m.permissionEditor.EnvironmentPermissions,
 		}
 
@@ -506,7 +480,6 @@ func (m Model) handlePermissionEditorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Update the user in the users list locally
 		for i := range m.users {
 			if m.users[i].Email == m.permissionEditor.UserEmail {
-				m.users[i].ProjectPermissions = &m.permissionEditor.ProjectPermissions
 				m.users[i].EnvironmentPermissions = &m.permissionEditor.EnvironmentPermissions
 				break
 			}
@@ -713,65 +686,32 @@ func (m Model) renderPermissionEditor() string {
 		return box
 	}
 
-	// Project permissions section
-	projectFocused := m.permissionEditor.FocusedSection == 0
-	projectTitle := "Project Permissions"
-	if projectFocused {
-		projectTitle = titleStyle.Render("▶ " + projectTitle)
-	} else {
-		projectTitle = dimTagStyle.Render("  " + projectTitle)
-	}
-
-	projectRead := checkbox(
-		m.permissionEditor.ProjectPermissions.Read,
-		projectFocused && m.permissionEditor.FocusedPermission == 0,
-	) + " Read"
-	projectWrite := checkbox(
-		m.permissionEditor.ProjectPermissions.Write,
-		projectFocused && m.permissionEditor.FocusedPermission == 1,
-	) + " Write"
-	projectDelete := checkbox(
-		m.permissionEditor.ProjectPermissions.Delete,
-		projectFocused && m.permissionEditor.FocusedPermission == 2,
-	) + " Delete"
-
 	// Environment permissions section
-	envFocused := m.permissionEditor.FocusedSection == 1
-	envTitle := "Environment Permissions"
-	if envFocused {
-		envTitle = titleStyle.Render("▶ " + envTitle)
-	} else {
-		envTitle = dimTagStyle.Render("  " + envTitle)
-	}
+	envTitle := titleStyle.Render("Environment Permissions")
 
 	envRead := checkbox(
 		m.permissionEditor.EnvironmentPermissions.Read,
-		envFocused && m.permissionEditor.FocusedPermission == 0,
+		m.permissionEditor.FocusedPermission == 0,
 	) + " Read"
 	envWrite := checkbox(
 		m.permissionEditor.EnvironmentPermissions.Write,
-		envFocused && m.permissionEditor.FocusedPermission == 1,
+		m.permissionEditor.FocusedPermission == 1,
 	) + " Write"
 	envDelete := checkbox(
 		m.permissionEditor.EnvironmentPermissions.Delete,
-		envFocused && m.permissionEditor.FocusedPermission == 2,
+		m.permissionEditor.FocusedPermission == 2,
 	) + " Delete"
 
 	prompt := lipgloss.JoinVertical(
 		lipgloss.Left,
 		headerStyle.Render(title),
 		"",
-		projectTitle,
-		"  " + projectRead,
-		"  " + projectWrite,
-		"  " + projectDelete,
-		"",
 		envTitle,
 		"  " + envRead,
 		"  " + envWrite,
 		"  " + envDelete,
 		"",
-		dimTagStyle.Render("Tab: Switch section | ↑/↓: Navigate | Space/Enter: Toggle | S: Save | Esc: Cancel"),
+		dimTagStyle.Render("↑/↓: Navigate | Space/Enter: Toggle | S: Save | Esc: Cancel"),
 	)
 
 	return modalStyle.Render(prompt)

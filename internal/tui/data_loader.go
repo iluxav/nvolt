@@ -267,17 +267,13 @@ func convertToUsers(orgUsers []*types.OrgUser, projectName, envName string) []Us
 			continue
 		}
 
-		var projectPerms *types.Permission
 		var envPerms *types.Permission
 
-		// Extract project and environment permissions if available
+		// Extract environment permissions if available (no project-level permissions anymore)
 		if orgUser.Permissions != nil {
-			// Find permissions for the current project
+			// Find permissions for the current environment
 			for _, proj := range orgUser.Permissions.Projects {
 				if proj.ProjectName == projectName {
-					projectPerms = &proj.Permissions
-
-					// Find permissions for the current environment
 					for _, env := range proj.Environments {
 						if env.Environment == envName {
 							envPerms = &env.Permissions
@@ -294,7 +290,6 @@ func convertToUsers(orgUsers []*types.OrgUser, projectName, envName string) []Us
 			Email:                  orgUser.User.Email,
 			OrgRole:                orgUser.Role,
 			UserID:                 orgUser.UserID,
-			ProjectPermissions:     projectPerms,
 			EnvironmentPermissions: envPerms,
 		})
 	}

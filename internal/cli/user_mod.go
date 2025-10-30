@@ -76,59 +76,51 @@ func runUserModify(aclService *services.ACLService, orgID, email string) error {
 		return err
 	}
 
-	var projectPermissions *types.Permission
 	var envPermissions *types.Permission
 	var selectedEnvironment string
 
 	// Handle "All" projects selection
 	if selectedProject == "All" {
-		fmt.Println(warnStyle.Render("⚠ WARNING! This will grant permissions for ALL projects and ALL environments in this org"))
+		fmt.Println(warnStyle.Render("⚠ WARNING! This will grant environment permissions for ALL projects and ALL environments in this org"))
 
-		// Prompt for project permissions
-		projectPermissions, err = promptForPermissionsWithDefaults("Project Permissions (applies to ALL projects)", nil)
+		// Prompt for environment permissions (applies to all)
+		envPermissions, err = promptForPermissionsWithDefaults("Environment Permissions (applies to ALL environments)", nil)
 		if err != nil {
 			return err
 		}
 
-		// Automatically apply same permissions to all environments
-		envPermissions = projectPermissions
-
-		// Apply to all projects - we'll need to iterate and update each one
-		// For simplicity, we'll send one request per project
+		// Apply to all environments across all projects
 		for _, proj := range currentPerms.AllProjects {
-			req := &types.ModifyUserPermissionsRequest{
-				Email:                  email,
-				Role:                   newRole,
-				ProjectName:            proj,
-				ProjectPermissions:     projectPermissions,
-				EnvironmentPermissions: envPermissions,
+			// Get all environments for this project
+			var projectEnvs []string
+			for _, p := range currentPerms.Projects {
+				if p.ProjectName == proj {
+					projectEnvs = p.AllEnvironments
+					break
+				}
 			}
 
-			fmt.Println(infoStyle.Render(fmt.Sprintf("→ Updating permissions for project: %s", proj)))
-			_, err := aclService.ModifyUserPermissions(orgID, req)
-			if err != nil {
-				fmt.Println(errorStyle.Render(fmt.Sprintf("✗ Failed to modify permissions for project %s: %v", proj, err)))
-				return err
+			// Apply to each environment
+			for _, env := range projectEnvs {
+				req := &types.ModifyUserPermissionsRequest{
+					Email:                  email,
+					Role:                   newRole,
+					ProjectName:            proj,
+					Environment:            env,
+					EnvironmentPermissions: envPermissions,
+				}
+
+				fmt.Println(infoStyle.Render(fmt.Sprintf("→ Updating permissions for %s/%s", proj, env)))
+				_, err := aclService.ModifyUserPermissions(orgID, req)
+				if err != nil {
+					fmt.Println(errorStyle.Render(fmt.Sprintf("✗ Failed to modify permissions for %s/%s: %v", proj, env, err)))
+					return err
+				}
 			}
 		}
 
-		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Successfully updated permissions for user %s across all projects", email)))
+		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Successfully updated permissions for user %s across all projects/environments", email)))
 		return nil
-	}
-
-	// Step 3: Get current project permissions if user has them
-	var currentProjectPerms *types.Permission
-	for _, proj := range currentPerms.Projects {
-		if proj.ProjectName == selectedProject {
-			currentProjectPerms = &proj.Permissions
-			break
-		}
-	}
-
-	// Prompt for project permissions
-	projectPermissions, err = promptForPermissionsWithDefaults(fmt.Sprintf("Project Permissions for '%s'", selectedProject), currentProjectPerms)
-	if err != nil {
-		return err
 	}
 
 	// Step 4: Show interactive single selection of Environments for the selected project + option "All"
@@ -149,7 +141,7 @@ func runUserModify(aclService *services.ACLService, orgID, email string) error {
 	// Handle "All" environments selection
 	if selectedEnvironment == "All" {
 		// Prompt for environment permissions
-		envPermissions, err = promptForPermissionsWithDefaults("Environment Permissions (applies to ALL environments)", nil)
+		envPermissions, err = promptForPermissionsWithDefaults("Environment Permissions (applies to ALL environments in this project)", nil)
 		if err != nil {
 			return err
 		}
@@ -162,34 +154,22 @@ func runUserModify(aclService *services.ACLService, orgID, email string) error {
 					Role:                   newRole,
 					ProjectName:            selectedProject,
 					Environment:            env,
-					ProjectPermissions:     projectPermissions,
 					EnvironmentPermissions: envPermissions,
 				}
 
-				fmt.Println(infoStyle.Render(fmt.Sprintf("→ Updating permissions for environment: %s", env)))
+				fmt.Println(infoStyle.Render(fmt.Sprintf("→ Updating permissions for %s/%s", selectedProject, env)))
 				_, err := aclService.ModifyUserPermissions(orgID, req)
 				if err != nil {
-					fmt.Println(errorStyle.Render(fmt.Sprintf("✗ Failed to modify permissions for environment %s: %v", env, err)))
+					fmt.Println(errorStyle.Render(fmt.Sprintf("✗ Failed to modify permissions for %s/%s: %v", selectedProject, env, err)))
 					return err
 				}
 			}
 		} else {
-			// No environments yet, just update project permissions
-			req := &types.ModifyUserPermissionsRequest{
-				Email:              email,
-				Role:               newRole,
-				ProjectName:        selectedProject,
-				ProjectPermissions: projectPermissions,
-			}
-
-			_, err := aclService.ModifyUserPermissions(orgID, req)
-			if err != nil {
-				fmt.Println(errorStyle.Render(fmt.Sprintf("✗ Failed to modify permissions: %v", err)))
-				return err
-			}
+			fmt.Println(warnStyle.Render("⚠ No environments exist yet for this project"))
+			return nil
 		}
 
-		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Successfully updated permissions for user %s", email)))
+		fmt.Println(successStyle.Render(fmt.Sprintf("✓ Successfully updated permissions for user %s in project %s", email, selectedProject)))
 		return nil
 	}
 
@@ -219,7 +199,6 @@ func runUserModify(aclService *services.ACLService, orgID, email string) error {
 		Role:                   newRole,
 		ProjectName:            selectedProject,
 		Environment:            selectedEnvironment,
-		ProjectPermissions:     projectPermissions,
 		EnvironmentPermissions: envPermissions,
 	}
 

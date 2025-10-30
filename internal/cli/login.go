@@ -23,12 +23,13 @@ For interactive login (default):
   nvolt login
 
 For silent login (CI/CD):
-  nvolt login --silent --machine ci-runner-prod
+  nvolt login --silent --machine ci-runner-prod --org org-id-123
 
 Silent login requires ~/.nvolt/private_key.pem file to exist.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		silent, _ := cmd.Flags().GetBool("silent")
 		machineName, _ := cmd.Flags().GetString("machine")
+		orgID, _ := cmd.Flags().GetString("org")
 
 		machineConfig := services.MachineConfigFromContext(cmd.Context())
 
@@ -36,7 +37,10 @@ Silent login requires ~/.nvolt/private_key.pem file to exist.`,
 			if machineName == "" {
 				return fmt.Errorf("--machine flag is required with --silent")
 			}
-			return runSilentLogin(machineConfig, machineName)
+			if orgID == "" {
+				return fmt.Errorf("--org flag is required with --silent to specify which organization to authenticate for")
+			}
+			return runSilentLogin(machineConfig, machineName, orgID)
 		}
 
 		return runLogin(machineConfig)
@@ -46,6 +50,7 @@ Silent login requires ~/.nvolt/private_key.pem file to exist.`,
 func init() {
 	loginCmd.Flags().BoolP("silent", "s", false, "Silent login using private key (for CI/CD)")
 	loginCmd.Flags().StringP("machine", "m", "", "Machine name for silent login")
+	loginCmd.Flags().StringP("org", "o", "", "Organization ID for silent login")
 	rootCmd.AddCommand(loginCmd)
 }
 
@@ -88,7 +93,6 @@ func pollForToken(machineConfig *services.MachineConfig) error {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Add("X-Machine-ID", machineConfig.Config.MachineID)
-		fmt.Println("Polling for token...")
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -126,8 +130,8 @@ func pollForToken(machineConfig *services.MachineConfig) error {
 	return fmt.Errorf("authentication timeout")
 }
 
-func runSilentLogin(machineConfig *services.MachineConfig, machineName string) error {
-	fmt.Println(titleStyle.Render(fmt.Sprintf("🔐 Silent login for machine: %s", machineName)))
+func runSilentLogin(machineConfig *services.MachineConfig, machineName string, orgID string) error {
+	fmt.Println(titleStyle.Render(fmt.Sprintf("🔐 Silent login for machine: %s (org: %s)", machineName, orgID)))
 
 	// Step 1: Load private key from file
 
@@ -140,7 +144,7 @@ func runSilentLogin(machineConfig *services.MachineConfig, machineName string) e
 
 	// Step 2: Request challenge from server
 	authClient := services.NewAuthClient(machineConfig.Config)
-	challenge, challengeID, err := authClient.RequestChallenge(machineName)
+	challenge, challengeID, err := authClient.RequestChallenge(machineName, orgID)
 	if err != nil {
 		return fmt.Errorf("failed to request challenge: %w", err)
 	}
@@ -152,13 +156,14 @@ func runSilentLogin(machineConfig *services.MachineConfig, machineName string) e
 	}
 
 	// Step 4: Verify signature and get JWT
-	token, err := authClient.VerifySignature(machineName, challengeID, signature)
+	token, err := authClient.VerifySignature(machineName, challengeID, signature, orgID)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	// Step 5: Save JWT, machine ID, and private key
+	// Step 5: Save JWT, machine ID, active org ID, and private key
 	machineConfig.Config.MachineID = machineName
+	machineConfig.Config.ActiveOrgID = orgID
 
 	if err := machineConfig.SaveJWT(token); err != nil {
 		return fmt.Errorf("failed to save token: %w", err)

@@ -63,6 +63,15 @@ func runPull(machineConfig *services.MachineConfig, aclService *services.ACLServ
 	s.Stop()
 	fmt.Print("\033[K")
 	if err != nil {
+		// Check if it's a permission error (403 Forbidden)
+		if strings.Contains(err.Error(), "status: 403") || strings.Contains(err.Error(), "Forbidden") {
+			fmt.Println("\n" + warnStyle.Render("⚠ Permission Denied"))
+			fmt.Println(infoStyle.Render("\nYou don't have read permission for this environment."))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Project: %s", machineConfig.GetProject())))
+			fmt.Println(infoStyle.Render(fmt.Sprintf("  Environment: %s", machineConfig.GetEnvironment())))
+			fmt.Println(infoStyle.Render("\nPlease contact your organization admin to grant you access."))
+			return nil
+		}
 		// Check if it's a "no wrapped key" error (new machine not synced yet)
 		if strings.Contains(err.Error(), "no wrapped key") || strings.Contains(err.Error(), "WrappedKey is empty") {
 			fmt.Println("\n" + warnStyle.Render("⚠ No secrets found for this machine"))
@@ -75,7 +84,7 @@ func runPull(machineConfig *services.MachineConfig, aclService *services.ACLServ
 	}
 
 	if len(vars) == 0 {
-		fmt.Println("\n" + warnStyle.Render("⚠ No variables found for this scope"))
+		fmt.Println("\n" + warnStyle.Render("⚠ No variables found for this scope.\nIf you just logged in, please run the command `nvolt sync` from any authorized machine to sync your machine."))
 		return nil
 	}
 

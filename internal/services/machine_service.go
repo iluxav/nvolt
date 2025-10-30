@@ -22,9 +22,9 @@ func NewMachineService(config *types.MachineLocalConfig) *MachineService {
 }
 
 // SaveMachineKey saves a machine's public key to the server
-func (s *MachineService) SaveMachineKey(orgID string, req *types.SaveMachinePublicKeyRequestDTO) error {
-
-	machineKeyURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", s.config.ServerURL, orgID)
+// Server automatically grants access to all user's organizations
+func (s *MachineService) SaveMachineKey(req *types.SaveMachinePublicKeyRequestDTO) error {
+	machineKeyURL := fmt.Sprintf("%s/api/v1/machines", s.config.ServerURL)
 
 	resp, err := helpers.CallAPIWithPayload[types.SaveMachinePublicKeyResponseDTO](
 		machineKeyURL,
@@ -33,7 +33,7 @@ func (s *MachineService) SaveMachineKey(orgID string, req *types.SaveMachinePubl
 		req,
 		s.config.MachineID,
 	)
-	if err != nil || !resp.Success {
+	if err != nil {
 		return fmt.Errorf("failed to save machine key: %w", err)
 	}
 

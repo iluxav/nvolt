@@ -60,50 +60,28 @@ func (s *MachineConfig) SavePublicKey() {
 func (s *MachineConfig) SaveMachineConfigToServer() error {
 	serverURL := helpers.GetEnv("SERVER_BASE_URL", "https://nvolt.io")
 
-	// Step 1: Get user's organizations to determine which org to save the machine to
-	var orgID string
-	if s.Config.ActiveOrgID != "" {
-		orgID = s.Config.ActiveOrgID
-	} else {
-		// Fetch user orgs and use the first one (for first-time login)
-		userOrgsURL := fmt.Sprintf("%s/api/v1/user/orgs", serverURL)
-		orgUsers, err := helpers.CallAPI[[]*types.OrgUser](userOrgsURL, "GET", s.Config.JWT_Token, s.Config.MachineID)
-		if err != nil {
-			return fmt.Errorf("failed to fetch user organizations: %w", err)
-		}
-
-		if orgUsers == nil || len(*orgUsers) == 0 {
-			return fmt.Errorf("user has no organizations")
-		}
-
-		// Use the first org
-		orgID = (*orgUsers)[0].OrgID
-
-		// Save it as active org for future use
-		s.Config.ActiveOrgID = orgID
-		saveConfig(s.Config)
-	}
-
-	// Step 2: Read private key from file
+	// Step 1: Read private key from file
 	privateKey, err := s.GetPrivateKey()
 	if err != nil {
 		return fmt.Errorf("failed to read private key: %w", err)
 	}
 
-	// Step 3: Extract public key from private key
+	// Step 2: Extract public key from private key
 	publicKey, err := crypto.ExtractPublicKey(privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to extract public key: %w", err)
 	}
 
-	// Step 4: Save machine key to server with org_id in path
-	saveMachineKeyURL := fmt.Sprintf("%s/api/v1/organizations/%s/machines", serverURL, orgID)
+	// Step 3: Save machine key to server
+	// The server will automatically grant access to ALL user's organizations
+	saveMachineKeyURL := fmt.Sprintf("%s/api/v1/machines", serverURL)
 
 	requestBody := &types.SaveMachinePublicKeyRequestDTO{
 		MachineID: s.Config.MachineID,
 		Name:      helpers.GetLocalMachineName(),
 		PublicKey: publicKey,
 	}
+
 	_, err = helpers.CallAPIWithPayload[types.SaveMachinePublicKeyResponseDTO](
 		saveMachineKeyURL,
 		"POST",
@@ -114,6 +92,7 @@ func (s *MachineConfig) SaveMachineConfigToServer() error {
 	if err != nil {
 		return fmt.Errorf("failed to save machine key: %w", err)
 	}
+
 	return nil
 }
 

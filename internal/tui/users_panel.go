@@ -50,14 +50,13 @@ func (m Model) renderUsersContent(width int) string {
 
 	// Table headers
 	// Adjust to fit within panel width
-	headers := []string{"Name", "Email", "Project Perms", "Env Perms", "Org Role"}
+	headers := []string{"Name", "Email", "Env Perms", "Org Role"}
 	usableWidth := width - 6
 	headerWidths := []int{
 		usableWidth / 5,      // Name: 20%
 		usableWidth * 3 / 10, // Email: 30%
-		usableWidth / 6,      // Project Perms: ~17%
-		usableWidth / 6,      // Env Perms: ~17%
-		usableWidth / 6,      // Org Role: ~17%
+		usableWidth / 4,      // Env Perms: 25%
+		usableWidth / 4,      // Org Role: 25%
 	}
 
 	headerRow := ""
@@ -71,30 +70,25 @@ func (m Model) renderUsersContent(width int) string {
 		// Determine if this row is selected
 		isSelected := i == m.usersCursor && m.focusedPanel == RightPanel && m.activeTab == UsersTab
 
-		// Format project permissions
-		projectPerms := formatPermissions(user.ProjectPermissions)
-
 		// Format environment permissions
 		envPerms := formatPermissions(user.EnvironmentPermissions)
 
 		// Build row
-		var nameCell, emailCell, projectPermsCell, envPermsCell, roleCell string
+		var nameCell, emailCell, envPermsCell, roleCell string
 		if isSelected {
 			// Selected row - highlight
 			nameCell = selectedRowStyle.Width(headerWidths[0]).Render(user.Name)
 			emailCell = selectedRowStyle.Width(headerWidths[1]).Render(user.Email)
-			projectPermsCell = selectedRowStyle.Width(headerWidths[2]).Render(projectPerms)
-			envPermsCell = selectedRowStyle.Width(headerWidths[3]).Render(envPerms)
-			roleCell = selectedRowStyle.Width(headerWidths[4]).Render(user.OrgRole)
+			envPermsCell = selectedRowStyle.Width(headerWidths[2]).Render(envPerms)
+			roleCell = selectedRowStyle.Width(headerWidths[3]).Render(user.OrgRole)
 		} else {
 			nameCell = tableRowStyle.Width(headerWidths[0]).Render(user.Name)
 			emailCell = tableRowStyle.Width(headerWidths[1]).Render(user.Email)
-			projectPermsCell = tableRowStyle.Width(headerWidths[2]).Render(projectPerms)
-			envPermsCell = tableRowStyle.Width(headerWidths[3]).Render(envPerms)
-			roleCell = tableRowStyle.Width(headerWidths[4]).Render(user.OrgRole)
+			envPermsCell = tableRowStyle.Width(headerWidths[2]).Render(envPerms)
+			roleCell = tableRowStyle.Width(headerWidths[3]).Render(user.OrgRole)
 		}
 
-		row := lipgloss.JoinHorizontal(lipgloss.Left, nameCell, emailCell, projectPermsCell, envPermsCell, roleCell)
+		row := lipgloss.JoinHorizontal(lipgloss.Left, nameCell, emailCell, envPermsCell, roleCell)
 		rows = append(rows, row)
 	}
 

@@ -53,7 +53,7 @@ func runMachineAdd(machineConfig *services.MachineConfig, secretsClient *service
 	fmt.Println(infoStyle.Render("→ Saving public key to server..."))
 
 	machineService := services.NewMachineService(machineConfig.Config)
-	err = machineService.SaveMachineKey(orgID, &types.SaveMachinePublicKeyRequestDTO{
+	err = machineService.SaveMachineKey(&types.SaveMachinePublicKeyRequestDTO{
 		MachineID: machineName,
 		Name:      machineName,
 		PublicKey: keyPair.PublicKey,
