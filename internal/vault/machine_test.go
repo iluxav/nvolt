@@ -10,24 +10,26 @@ import (
 
 func TestGenerateMachineID(t *testing.T) {
 	tests := []struct {
-		hostname string
-		prefix   string
+		hostname    string
+		fingerprint string
+		wantPrefix  string
 	}{
-		{"localhost", "m-localhost"},
-		{"myserver", "m-myserver"},
-		{"", "m-"},
-		{"unknown", "m-"},
+		{"localhost", "SHA256:abcd1234", "m-localhost-abcd1234"},
+		{"myserver", "SHA256:xyz789ab", "m-myserver-xyz789ab"},
+		{"test", "SHA256:short", "m-test"}, // Short fingerprint won't add suffix
+		{"", "SHA256:abcd1234", "m-"},      // Empty hostname uses timestamp
+		{"unknown", "SHA256:test", "m-"},   // Unknown hostname uses timestamp
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.hostname, func(t *testing.T) {
-			id := GenerateMachineID(tt.hostname)
-			if len(id) < len(tt.prefix) {
+			id := GenerateMachineID(tt.hostname, tt.fingerprint)
+			if len(id) < 2 {
 				t.Errorf("Machine ID too short: %s", id)
 			}
 			if tt.hostname != "" && tt.hostname != "unknown" {
-				if id != tt.prefix {
-					t.Errorf("Expected %s, got %s", tt.prefix, id)
+				if id != tt.wantPrefix {
+					t.Errorf("Expected %s, got %s", tt.wantPrefix, id)
 				}
 			}
 		})

@@ -82,22 +82,23 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 
 	if isNew {
 		fmt.Println("✓ Generated new master key")
-
-		// Get current machine info for GrantedBy
-		machineInfo, err := vault.LoadMachineInfo()
-		if err != nil {
-			return fmt.Errorf("failed to load machine info: %w", err)
-		}
-
-		// Wrap master key for all machines
-		fmt.Println("Wrapping master key for all machines...")
-		if err := vault.WrapMasterKeyForMachines(vaultPath, masterKey, machineInfo.ID); err != nil {
-			return fmt.Errorf("failed to wrap master key: %w", err)
-		}
-		fmt.Println("✓ Master key wrapped for all machines")
 	} else {
 		fmt.Println("✓ Using existing master key")
 	}
+
+	// Get current machine info for GrantedBy
+	machineInfo, err := vault.LoadMachineInfo()
+	if err != nil {
+		return fmt.Errorf("failed to load machine info: %w", err)
+	}
+
+	// ALWAYS wrap master key for all machines (not just when new)
+	// This ensures newly added machines get access to the master key
+	fmt.Println("Wrapping master key for all machines...")
+	if err := vault.WrapMasterKeyForMachines(vaultPath, masterKey, machineInfo.ID); err != nil {
+		return fmt.Errorf("failed to wrap master key: %w", err)
+	}
+	fmt.Println("✓ Master key wrapped for all machines")
 
 	// Encrypt and save each secret
 	fmt.Printf("Encrypting %d secrets for environment '%s'...\n", len(secrets), environment)

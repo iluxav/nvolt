@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -67,12 +68,27 @@ type HomePaths struct {
 
 // GetHomePaths returns the home directory paths
 func GetHomePaths() (*HomePaths, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
+	var root string
 
-	root := filepath.Join(homeDir, HomeNvoltDir)
+	// Check for NVOLT_CONFIG override
+	if configDir := os.Getenv("NVOLT_CONFIG"); configDir != "" {
+		// Expand tilde if present
+		if strings.HasPrefix(configDir, "~/") {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get home directory: %w", err)
+			}
+			configDir = filepath.Join(homeDir, configDir[2:])
+		}
+		root = configDir
+	} else {
+		// Use default ~/.nvolt
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		root = filepath.Join(homeDir, HomeNvoltDir)
+	}
 
 	return &HomePaths{
 		Root:        root,

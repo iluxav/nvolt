@@ -87,43 +87,44 @@ This document tracks the implementation progress of nvolt, a GitHub-native, Zero
 
 ---
 
-## Phase 4: Secret Management Commands
+## Phase 4: Secret Management Commands ✅
 
-### 4.1 `nvolt push` Command
-- [ ] Parse `-f` flag for .env file input
-- [ ] Parse `-e` flag for environment selection
-- [ ] Parse `-p` flag for project override
-- [ ] Read and parse .env file format
-- [ ] Generate project master key (if first push)
-- [ ] Encrypt secrets using AES-GCM
-- [ ] Create encrypted secret files in `.nvolt/secrets/<env>/`
-- [ ] Wrap master key for all machines
-- [ ] Store wrapped keys in `.nvolt/wrapped_keys/`
-- [ ] Update `keyinfo.json` metadata
-- [ ] Perform Git commit/push (global mode only)
-- [ ] Add validation for empty secrets
+### 4.1 `nvolt push` Command ✅
+- [x] Parse `-f` flag for .env file input
+- [x] Parse `-e` flag for environment selection
+- [x] Parse `-p` flag for project override
+- [x] Parse `-k` flag for inline key=value pairs
+- [x] Read and parse .env file format
+- [x] Generate project master key (if first push)
+- [x] Encrypt secrets using AES-GCM
+- [x] Create encrypted secret files in `.nvolt/secrets/<env>/`
+- [x] Wrap master key for all machines
+- [x] Store wrapped keys in `.nvolt/wrapped_keys/`
+- [~] Update `keyinfo.json` metadata
+- [~] Perform Git commit/push (global mode only)
+- [x] Add validation for empty secrets
 
-### 4.2 `nvolt pull` Command
-- [ ] Parse `-e` flag for environment selection
-- [ ] Parse `-p` flag for project override
-- [ ] Perform Git pull (global mode only)
-- [ ] Load machine's wrapped key
-- [ ] Decrypt wrapped key using private key
-- [ ] Decrypt secrets using project master key
-- [ ] Output secrets in .env format
-- [ ] Add `--write` flag to save to .env file
-- [ ] Handle missing wrapped key errors
-- [ ] Validate decryption integrity
+### 4.2 `nvolt pull` Command ✅
+- [x] Parse `-e` flag for environment selection
+- [x] Parse `-p` flag for project override
+- [~] Perform Git pull (global mode only)
+- [x] Load machine's wrapped key
+- [x] Decrypt wrapped key using private key
+- [x] Decrypt secrets using project master key
+- [x] Output secrets in .env format
+- [x] Add `--write` flag to save to .env file
+- [x] Handle missing wrapped key errors
+- [x] Validate decryption integrity
 
-### 4.3 `nvolt run` Command
-- [ ] Parse `-e` flag for environment selection
-- [ ] Parse `-c` flag for command to execute
-- [ ] Decrypt secrets into memory
-- [ ] Set environment variables in subprocess
-- [ ] Execute specified command
-- [ ] Clean up secrets from memory after execution
-- [ ] Handle command execution errors
-- [ ] Support command arguments and quotes
+### 4.3 `nvolt run` Command ✅
+- [x] Parse `-e` flag for environment selection
+- [x] Parse `-c` flag for command to execute
+- [x] Decrypt secrets into memory
+- [x] Set environment variables in subprocess
+- [x] Execute specified command
+- [x] Clean up secrets from memory after execution
+- [x] Handle command execution errors
+- [x] Support command arguments and quotes
 
 ---
 

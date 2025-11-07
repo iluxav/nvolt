@@ -21,6 +21,7 @@ fmt:
 clean:
 	rm -rf bin/
 	rm -f coverage.out
+	rm -rf ~/.nvolt
 
 # Install dependencies
 deps:

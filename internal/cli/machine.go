@@ -90,7 +90,7 @@ func runMachineAdd(machineName string) error {
 	}
 
 	// Create machine info
-	machineID := vault.GenerateMachineID(machineName)
+	machineID := vault.GenerateMachineID(machineName, fingerprint)
 	machineInfo := &types.MachineInfo{
 		ID:          machineID,
 		PublicKey:   string(publicKeyPEM),
@@ -127,8 +127,41 @@ func runMachineRm(machineName string) error {
 		return err
 	}
 
-	// Convert name to machine ID
-	machineID := vault.GenerateMachineID(machineName)
+	// List all machines and find matching ones
+	machines, err := vault.ListMachines(vaultPath)
+	if err != nil {
+		return fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	// Find machines matching the hostname or ID
+	var matchingMachines []*types.MachineInfo
+	for _, m := range machines {
+		if m.Hostname == machineName || m.ID == machineName {
+			matchingMachines = append(matchingMachines, m)
+		}
+	}
+
+	if len(matchingMachines) == 0 {
+		return fmt.Errorf("no machine found with name or ID: %s", machineName)
+	}
+
+	var machineID string
+	if len(matchingMachines) == 1 {
+		machineID = matchingMachines[0].ID
+	} else {
+		// Multiple matches - let user choose
+		fmt.Println("\nMultiple machines found:")
+		for i, m := range matchingMachines {
+			fmt.Printf("%d. %s (Fingerprint: %s)\n", i+1, m.ID, m.Fingerprint)
+		}
+		fmt.Print("\nEnter number to remove: ")
+		var choice int
+		fmt.Scanln(&choice)
+		if choice < 1 || choice > len(matchingMachines) {
+			return fmt.Errorf("invalid choice")
+		}
+		machineID = matchingMachines[choice-1].ID
+	}
 
 	// Confirm removal
 	fmt.Printf("Are you sure you want to remove machine %s? This cannot be undone. (yes/no): ", machineID)

@@ -2,7 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 
+	"github.com/nvolt/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -21,18 +25,108 @@ Examples:
 		project, _ := cmd.Flags().GetString("project")
 		write, _ := cmd.Flags().GetBool("write")
 
-		// TODO: Implement pull logic
-		fmt.Printf("Pulling secrets...\n")
-		fmt.Printf("Environment: %s\n", environment)
-		if project != "" {
-			fmt.Printf("Project: %s\n", project)
-		}
-		if write {
-			fmt.Printf("Will write to .env file\n")
+		return runPull(environment, project, write)
+	},
+}
+
+func runPull(environment, project string, write bool) error {
+	fmt.Println("Pulling secrets from vault...")
+
+	// Find vault path
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return err
+	}
+
+	paths := vault.GetVaultPaths(vaultPath)
+
+	// Unwrap master key
+	masterKey, err := vault.UnwrapMasterKey(vaultPath)
+	if err != nil {
+		return fmt.Errorf("failed to unwrap master key: %w\nMake sure you have pushed secrets first", err)
+	}
+
+	// Get list of secret files for this environment
+	secretsDir := paths.GetSecretsPath(environment)
+	secretFiles, err := vault.ListFiles(secretsDir)
+	if err != nil {
+		return fmt.Errorf("failed to list secrets: %w", err)
+	}
+
+	if len(secretFiles) == 0 {
+		return fmt.Errorf("no secrets found for environment '%s'", environment)
+	}
+
+	// Decrypt all secrets
+	secrets := make(map[string]string)
+	for _, secretFile := range secretFiles {
+		// Extract key name from filename (remove .enc.json)
+		filename := filepath.Base(secretFile)
+		if !filepath.IsAbs(secretFile) {
+			secretFile = filepath.Join(secretsDir, filename)
 		}
 
-		return fmt.Errorf("not yet implemented")
-	},
+		// Get key name
+		key := filename
+		if len(key) > 9 && key[len(key)-9:] == ".enc.json" {
+			key = key[:len(key)-9]
+		}
+
+		// Load and decrypt secret
+		encrypted, err := vault.LoadEncryptedSecret(paths, environment, key)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to load secret %s: %v\n", key, err)
+			continue
+		}
+
+		value, err := vault.DecryptSecret(masterKey, encrypted)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to decrypt secret %s: %v\n", key, err)
+			continue
+		}
+
+		secrets[key] = value
+	}
+
+	if len(secrets) == 0 {
+		return fmt.Errorf("no secrets could be decrypted")
+	}
+
+	fmt.Printf("✓ Decrypted %d secrets from environment '%s'\n\n", len(secrets), environment)
+
+	// Format output
+	output := vault.FormatEnvOutput(secrets)
+
+	if write {
+		// Write to .env file
+		envFile := ".env"
+		if environment != "default" {
+			envFile = fmt.Sprintf(".env.%s", environment)
+		}
+
+		err := os.WriteFile(envFile, []byte(output), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write .env file: %w", err)
+		}
+
+		fmt.Printf("✓ Written to %s\n", envFile)
+	} else {
+		// Print to stdout
+		fmt.Println("Secrets:")
+
+		// Sort keys for consistent output
+		keys := make([]string, 0, len(secrets))
+		for k := range secrets {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			fmt.Printf("%s=%s\n", key, secrets[key])
+		}
+	}
+
+	return nil
 }
 
 func init() {

@@ -61,7 +61,7 @@ func InitializeMachine() (*types.MachineInfo, error) {
 
 	// Create machine info
 	machineInfo := &types.MachineInfo{
-		ID:          GenerateMachineID(hostname),
+		ID:          GenerateMachineID(hostname, fingerprint),
 		PublicKey:   string(publicKeyPEM),
 		Fingerprint: fingerprint,
 		Hostname:    hostname,
@@ -143,12 +143,34 @@ func LoadPrivateKey() (*crypto.RSAPrivateKey, error) {
 	return privateKey, nil
 }
 
-// GenerateMachineID generates a machine ID from hostname
-func GenerateMachineID(hostname string) string {
+// GenerateMachineID generates a machine ID from hostname and fingerprint
+func GenerateMachineID(hostname, fingerprint string) string {
 	if hostname == "" || hostname == "unknown" {
 		return fmt.Sprintf("m-%d", time.Now().Unix())
 	}
-	return fmt.Sprintf("m-%s", hostname)
+
+	// Use first 8 characters of fingerprint (after SHA256:) to make ID unique
+	// This allows multiple machines with same hostname to have different IDs
+	fingerprintSuffix := ""
+	if len(fingerprint) > 7 {
+		// Remove "SHA256:" prefix and get first 8 chars of the hash
+		fpHash := fingerprint[7:] // Skip "SHA256:"
+		if len(fpHash) >= 8 {
+			// Replace any characters that are invalid in filenames
+			// Specifically replace / with _ to avoid creating subdirectories
+			safeFpHash := ""
+			for _, ch := range fpHash[:8] {
+				if ch == '/' || ch == '\\' || ch == ':' {
+					safeFpHash += "_"
+				} else {
+					safeFpHash += string(ch)
+				}
+			}
+			fingerprintSuffix = "-" + safeFpHash
+		}
+	}
+
+	return fmt.Sprintf("m-%s%s", hostname, fingerprintSuffix)
 }
 
 // AddMachineToVault adds a new machine's public key to the vault

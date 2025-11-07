@@ -77,9 +77,36 @@ func initLocalMode() error {
 		return fmt.Errorf("failed to get local vault path: %w", err)
 	}
 
+	// Load current machine info
+	machineInfo, err := vault.LoadMachineInfo()
+	if err != nil {
+		return fmt.Errorf("failed to load machine info: %w", err)
+	}
+
 	// Check if vault already exists
-	if vault.IsVaultInitialized(vaultPath) {
-		return fmt.Errorf("vault already initialized at %s", vaultPath)
+	vaultExists := vault.IsVaultInitialized(vaultPath)
+	if vaultExists {
+		fmt.Printf("\n✓ Vault already initialized at %s\n", vaultPath)
+
+		// Check if current machine is already in the vault
+		paths := vault.GetVaultPaths(vaultPath)
+		machinePath := paths.GetMachineInfoPath(machineInfo.ID)
+		if vault.FileExists(machinePath) {
+			fmt.Printf("✓ Machine %s already registered in vault\n", machineInfo.ID)
+		} else {
+			// Add current machine to existing vault
+			if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+				return fmt.Errorf("failed to add machine to vault: %w", err)
+			}
+			fmt.Printf("✓ Added machine %s to vault\n", machineInfo.ID)
+		}
+
+		fmt.Println("\nYou can now:")
+		fmt.Println("  - Push secrets: nvolt push -f .env")
+		fmt.Println("  - Pull secrets: nvolt pull")
+		fmt.Println("  - Add machines: nvolt machine add <name>")
+		fmt.Println("\nNote: In local mode, you are responsible for Git operations.")
+		return nil
 	}
 
 	// Initialize vault directory
@@ -88,11 +115,6 @@ func initLocalMode() error {
 	}
 
 	// Add current machine to vault
-	machineInfo, err := vault.LoadMachineInfo()
-	if err != nil {
-		return fmt.Errorf("failed to load machine info: %w", err)
-	}
-
 	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
@@ -133,9 +155,36 @@ func initGlobalMode(repoSpec string) error {
 	repoPath := filepath.Join(homePaths.Projects, org, repo)
 	vaultPath := filepath.Join(repoPath, vault.NvoltDir)
 
+	// Load current machine info
+	machineInfo, err := vault.LoadMachineInfo()
+	if err != nil {
+		return fmt.Errorf("failed to load machine info: %w", err)
+	}
+
 	// Check if already cloned
-	if vault.IsVaultInitialized(vaultPath) {
+	vaultExists := vault.IsVaultInitialized(vaultPath)
+	if vaultExists {
 		fmt.Printf("✓ Repository already cloned at %s\n", repoPath)
+
+		// Check if current machine is already in the vault
+		paths := vault.GetVaultPaths(vaultPath)
+		machinePath := paths.GetMachineInfoPath(machineInfo.ID)
+		if vault.FileExists(machinePath) {
+			fmt.Printf("✓ Machine %s already registered in vault\n", machineInfo.ID)
+		} else {
+			// Add current machine to existing vault
+			if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+				return fmt.Errorf("failed to add machine to vault: %w", err)
+			}
+			fmt.Printf("✓ Added machine %s to vault\n", machineInfo.ID)
+		}
+
+		fmt.Println("\nYou can now:")
+		fmt.Println("  - Push secrets: nvolt push -f .env")
+		fmt.Println("  - Pull secrets: nvolt pull")
+		fmt.Println("  - Add machines: nvolt machine add <name>")
+		fmt.Println("\nNote: nvolt will automatically commit and push changes to the repository.")
+
 		return nil
 	}
 
@@ -161,11 +210,6 @@ func initGlobalMode(repoSpec string) error {
 	}
 
 	// Add current machine to vault
-	machineInfo, err := vault.LoadMachineInfo()
-	if err != nil {
-		return fmt.Errorf("failed to load machine info: %w", err)
-	}
-
 	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
