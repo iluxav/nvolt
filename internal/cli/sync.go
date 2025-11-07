@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/nvolt/nvolt/internal/crypto"
+	"github.com/nvolt/nvolt/internal/git"
 	"github.com/nvolt/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -29,6 +30,17 @@ func runSync(rotate bool) error {
 	vaultPath, err := findVaultPath()
 	if err != nil {
 		return err
+	}
+
+	// Pull latest changes in global mode BEFORE doing any work
+	// This ensures we have the latest machine keys from other machines
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("Global mode: pulling latest changes...")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull latest changes: %w", err)
+		}
+		fmt.Println("✓ Pulled latest changes from repository")
 	}
 
 	// Get current machine info
@@ -92,6 +104,27 @@ func runSync(rotate bool) error {
 		fmt.Println("\nNote: The master key has been rotated. All machines can now decrypt secrets with the new key.")
 	} else {
 		fmt.Println("\nNote: All machines now have access to decrypt secrets.")
+	}
+
+	// Auto-commit and push in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("\nGlobal mode: committing and pushing changes...")
+
+		// Generate commit message
+		var commitMsg string
+		if rotate {
+			commitMsg = "Rotate master key and re-encrypt all secrets"
+		} else {
+			commitMsg = "Re-wrap master key for all machines"
+		}
+
+		// Commit and push
+		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+			return fmt.Errorf("failed to commit and push changes: %w", err)
+		}
+
+		fmt.Println("✓ Changes committed and pushed to repository")
 	}
 
 	return nil

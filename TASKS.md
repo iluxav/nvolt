@@ -160,25 +160,25 @@ This document tracks the implementation progress of nvolt, a GitHub-native, Zero
 
 ---
 
-## Phase 6: Git Integration
+## Phase 6: Git Integration ✅
 
-### 6.1 Git Helper Functions
-- [ ] Implement safe `git clone` with `-C` flag
-- [ ] Implement safe `git pull` with `-C` flag
-- [ ] Implement safe `git add` with `-C` flag
-- [ ] Implement safe `git commit` with `-C` flag
-- [ ] Implement safe `git push` with `-C` flag
-- [ ] Add Git error handling and surfacing
-- [ ] Never perform Git ops in local app directories
-- [ ] Add Git availability detection
+### 6.1 Git Helper Functions ✅
+- [x] Implement safe `git clone` with `-C` flag
+- [x] Implement safe `git pull` with `-C` flag
+- [x] Implement safe `git add` with `-C` flag
+- [x] Implement safe `git commit` with `-C` flag
+- [x] Implement safe `git push` with `-C` flag
+- [x] Add Git error handling and surfacing
+- [x] Never perform Git ops in local app directories
+- [x] Add Git availability detection
 
-### 6.2 Global Mode Git Automation
-- [ ] Auto-pull before read operations
-- [ ] Auto-commit after write operations
-- [ ] Generate meaningful commit messages
-- [ ] Add conflict detection
-- [ ] Handle merge conflicts gracefully
-- [ ] Skip Git ops if not in global mode
+### 6.2 Global Mode Git Automation ✅
+- [x] Auto-pull before read operations (pull command)
+- [x] Auto-commit after write operations (push, sync, machine add/rm)
+- [x] Generate meaningful commit messages
+- [x] Add conflict detection (SafePull)
+- [x] Handle merge conflicts gracefully (SafePull)
+- [x] Skip Git ops if not in global mode (mode detection)
 
 ---
 

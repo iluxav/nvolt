@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/nvolt/nvolt/internal/crypto"
+	"github.com/nvolt/nvolt/internal/git"
 	"github.com/nvolt/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,17 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	vaultPath, err := findVaultPath()
 	if err != nil {
 		return err
+	}
+
+	// Pull latest changes in global mode BEFORE doing any work
+	// This ensures we have the latest machine keys from other machines
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("Global mode: pulling latest changes...")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull latest changes: %w", err)
+		}
+		fmt.Println("✓ Pulled latest changes from repository")
 	}
 
 	paths := vault.GetVaultPaths(vaultPath)
@@ -119,6 +131,22 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	fmt.Println("\nSecrets encrypted:")
 	for key := range secrets {
 		fmt.Printf("  - %s\n", key)
+	}
+
+	// Auto-commit and push in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("\nGlobal mode: committing and pushing changes...")
+
+		// Generate commit message
+		commitMsg := fmt.Sprintf("Update secrets for environment '%s'", environment)
+
+		// Commit and push
+		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+			return fmt.Errorf("failed to commit and push changes: %w", err)
+		}
+
+		fmt.Println("✓ Changes committed and pushed to repository")
 	}
 
 	return nil

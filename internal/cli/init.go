@@ -169,7 +169,9 @@ func initGlobalMode(repoSpec string) error {
 		// Check if current machine is already in the vault
 		paths := vault.GetVaultPaths(vaultPath)
 		machinePath := paths.GetMachineInfoPath(machineInfo.ID)
-		if vault.FileExists(machinePath) {
+		machineExists := vault.FileExists(machinePath)
+
+		if machineExists {
 			fmt.Printf("✓ Machine %s already registered in vault\n", machineInfo.ID)
 		} else {
 			// Add current machine to existing vault
@@ -177,6 +179,18 @@ func initGlobalMode(repoSpec string) error {
 				return fmt.Errorf("failed to add machine to vault: %w", err)
 			}
 			fmt.Printf("✓ Added machine %s to vault\n", machineInfo.ID)
+		}
+
+		// Check if there are uncommitted changes (machine might exist but not be committed)
+		hasChanges, err := git.HasUncommittedChanges(repoPath)
+		if err == nil && hasChanges {
+			// Commit and push the machine
+			fmt.Println("\nCommitting machine to repository...")
+			commitMsg := fmt.Sprintf("Add machine %s to vault", machineInfo.ID)
+			if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+				return fmt.Errorf("failed to commit and push machine: %w", err)
+			}
+			fmt.Println("✓ Machine committed and pushed to repository")
 		}
 
 		fmt.Println("\nYou can now:")
@@ -213,6 +227,14 @@ func initGlobalMode(repoSpec string) error {
 	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
+
+	// Commit and push the machine's public key to repository
+	fmt.Println("\nCommitting machine to repository...")
+	commitMsg := fmt.Sprintf("Add machine %s to vault", machineInfo.ID)
+	if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+		return fmt.Errorf("failed to commit and push machine: %w", err)
+	}
+	fmt.Println("✓ Machine committed and pushed to repository")
 
 	fmt.Println("\n✓ Global vault initialized successfully")
 	fmt.Println("\nYou can now:")

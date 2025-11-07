@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/nvolt/nvolt/internal/git"
 	"github.com/nvolt/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,16 @@ func runPull(environment, project string, write bool) error {
 	vaultPath, err := findVaultPath()
 	if err != nil {
 		return err
+	}
+
+	// Auto-pull in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("Global mode: pulling latest changes from repository...")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull from repository: %w", err)
+		}
+		fmt.Println("✓ Repository up to date")
 	}
 
 	paths := vault.GetVaultPaths(vaultPath)

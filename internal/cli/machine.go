@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/nvolt/nvolt/internal/crypto"
+	"github.com/nvolt/nvolt/internal/git"
 	"github.com/nvolt/nvolt/internal/vault"
 	"github.com/nvolt/nvolt/pkg/types"
 	"github.com/spf13/cobra"
@@ -64,6 +66,16 @@ func runMachineAdd(machineName string) error {
 		return err
 	}
 
+	// Pull latest changes in global mode BEFORE doing any work
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("Global mode: pulling latest changes...")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull latest changes: %w", err)
+		}
+		fmt.Println("✓ Pulled latest changes from repository")
+	}
+
 	// Generate keypair for new machine
 	fmt.Println("Generating keypair...")
 	privateKey, err := crypto.GenerateRSAKeypair()
@@ -115,6 +127,19 @@ func runMachineAdd(machineName string) error {
 	fmt.Printf("2. Set permissions: chmod 600 ~/.nvolt/private_key.pem\n")
 	fmt.Printf("3. Save the machine info to ~/.nvolt/machines/machine-info.json\n")
 
+	// Auto-commit and push in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("\nGlobal mode: committing and pushing changes...")
+
+		commitMsg := fmt.Sprintf("Add machine: %s", machineName)
+		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+			return fmt.Errorf("failed to commit and push changes: %w", err)
+		}
+
+		fmt.Println("✓ Changes committed and pushed to repository")
+	}
+
 	return nil
 }
 
@@ -125,6 +150,16 @@ func runMachineRm(machineName string) error {
 	vaultPath, err := findVaultPath()
 	if err != nil {
 		return err
+	}
+
+	// Pull latest changes in global mode BEFORE doing any work
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("Global mode: pulling latest changes...")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull latest changes: %w", err)
+		}
+		fmt.Println("✓ Pulled latest changes from repository")
 	}
 
 	// List all machines and find matching ones
@@ -181,6 +216,19 @@ func runMachineRm(machineName string) error {
 	fmt.Println("\nNote: You should re-wrap the master key using 'nvolt sync' to ensure")
 	fmt.Println("the removed machine cannot decrypt new secrets.")
 
+	// Auto-commit and push in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		fmt.Println("\nGlobal mode: committing and pushing changes...")
+
+		commitMsg := fmt.Sprintf("Remove machine: %s", machineID)
+		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+			return fmt.Errorf("failed to commit and push changes: %w", err)
+		}
+
+		fmt.Println("✓ Changes committed and pushed to repository")
+	}
+
 	return nil
 }
 
@@ -225,9 +273,52 @@ func findVaultPath() (string, error) {
 		return localPath, nil
 	}
 
-	// TODO: Support finding global vault
-	// For now, just return error if local vault not found
-	return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
+	// Try to find global vault in ~/.nvolt/projects
+	homePaths, err := vault.GetHomePaths()
+	if err != nil {
+		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
+	}
+
+	// Check if projects directory exists
+	if !vault.FileExists(homePaths.Projects) {
+		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
+	}
+
+	// Scan for vaults in ~/.nvolt/projects/org/repo/.nvolt
+	vaultPath, err := findGlobalVault(homePaths.Projects)
+	if err != nil {
+		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
+	}
+
+	return vaultPath, nil
+}
+
+// findGlobalVault searches for a vault in ~/.nvolt/projects/
+// Returns the first valid vault found in the structure: ~/.nvolt/projects/org/repo/.nvolt
+func findGlobalVault(projectsDir string) (string, error) {
+	// List all org directories in ~/.nvolt/projects
+	orgDirs, err := vault.ListDirs(projectsDir)
+	if err != nil {
+		return "", fmt.Errorf("no global vaults found")
+	}
+
+	// Scan each org directory for repos
+	for _, orgDir := range orgDirs {
+		repoDirs, err := vault.ListDirs(orgDir)
+		if err != nil {
+			continue
+		}
+
+		// Check each repo for a .nvolt directory
+		for _, repoDir := range repoDirs {
+			vaultPath := filepath.Join(repoDir, ".nvolt")
+			if vault.IsVaultInitialized(vaultPath) {
+				return vaultPath, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no global vaults found")
 }
 
 func init() {
