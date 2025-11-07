@@ -33,8 +33,8 @@ nvolt operates in **two layers of responsibility**:
 ### 2️⃣ Global Mode (optional)
 
 - Can manage a **dedicated global GitHub repository** for shared secrets.
-- Performs **safe Git helper operations** (clone, pull, push) in `~/.nvolt/projects/`.
-- **Never** modifies Git state in the user’s application repositories.
+- Performs **safe Git helper operations** (clone, pull, push) in `~/.nvolt/orgs/`.
+- **Never** modifies Git state in the user's application repositories.
 
 ---
 
@@ -47,10 +47,12 @@ Represents the **application name**.
 - By default, nvolt automatically detects the project name from:
 
   - `package.json` → `name`
-  - `go.mod` → `module`
+  - `go.mod` → **full module path** (e.g., `github.com/user/project` → `github-com-user-project`)
   - `Cargo.toml` → `package.name`
   - `pyproject.toml` → `project.name`
   - Otherwise, falls back to **current directory name**.
+
+- The full module path ensures uniqueness across multiple organizations and repositories.
 
 - The project name can be overridden anytime using:
   ```bash
@@ -88,9 +90,9 @@ Initializes machine keys and sets up the vault structure.
 
 2. **If `--repo <org/repo>` provided:**
 
-   - Clone the Git repository into `~/.nvolt/projects/<org>/<repo>` if not already present.
+   - Clone the Git repository into `~/.nvolt/orgs/<org>/<repo>` if not already present.
      ```bash
-     git clone git@github.com:<org>/<repo>.git ~/.nvolt/projects/<org>/<repo>
+     git clone git@github.com:<org>/<repo>.git ~/.nvolt/orgs/<org>/<repo>
      ```
    - Subsequent nvolt operations in this vault may automatically perform safe Git operations (`pull`, `commit`, `push`).
 
@@ -100,10 +102,10 @@ Initializes machine keys and sets up the vault structure.
 
 ### Summary
 
-| Mode                        | Storage                            | Git Behavior          |
-| --------------------------- | ---------------------------------- | --------------------- |
-| `nvolt init --repo org/app` | `~/.nvolt/projects/org/app/.nvolt` | nvolt manages Git ops |
-| `nvolt init`                | `./.nvolt`                         | user manages Git ops  |
+| Mode                        | Storage                        | Git Behavior          |
+| --------------------------- | ------------------------------ | --------------------- |
+| `nvolt init --repo org/app` | `~/.nvolt/orgs/org/app/`       | nvolt manages Git ops |
+| `nvolt init`                | `./.nvolt`                     | user manages Git ops  |
 
 ---
 
@@ -116,13 +118,13 @@ Initializes machine keys and sets up the vault structure.
 2. **Git operations always use `-C` flag:**
 
    ```bash
-   git -C ~/.nvolt/projects/org/app pull
-   git -C ~/.nvolt/projects/org/app push
+   git -C ~/.nvolt/orgs/org/app pull
+   git -C ~/.nvolt/orgs/org/app push
    ```
 
 3. **No directory switching (`cd`)** — always use subprocess with `-C`.
 
-4. **Only perform Git operations** for repos in `~/.nvolt/projects/`.
+4. **Only perform Git operations** for repos in `~/.nvolt/orgs/`.
 
 5. **Never perform Git operations** in local app directories.
 
@@ -210,14 +212,22 @@ Initializes machine keys and sets up the vault structure.
   ├── private_key.pem
   ├── machines/
   │    └── m-localhost.json
-  └── projects/
-       └── myorg/app/
-            ├── .git/
-            └── .nvolt/
-                 ├── secrets/
-                 ├── wrapped_keys/
-                 ├── machines/
-                 └── keyinfo.json
+  └── orgs/
+       └── myorg/
+            └── app/                          # Storage repository
+                 ├── .git/
+                 ├── machines/                # Shared machines for this org/repo
+                 ├── github-com-user-project/ # Project 1 (full module path)
+                 │    ├── secrets/
+                 │    │    └── default/
+                 │    ├── wrapped_keys/
+                 │    └── keyinfo.json
+                 └── github-com-user-backend/ # Project 2
+                      ├── secrets/
+                      │    ├── default/
+                      │    └── production/
+                      ├── wrapped_keys/
+                      └── keyinfo.json
 ```
 
 ### Local Mode
@@ -286,7 +296,7 @@ Claude must:
 | Concept              | Description                     |
 | -------------------- | ------------------------------- |
 | `.nvolt/`            | Local encrypted vault           |
-| `~/.nvolt/projects/` | Global shared vaults            |
+| `~/.nvolt/orgs/`     | Global shared vaults (org repos)|
 | `private_key.pem`    | Local machine private key       |
 | `wrapped_keys/`      | Defines machine access          |
 | `secrets/*.enc.json` | Encrypted environment variables |
