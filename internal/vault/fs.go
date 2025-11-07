@@ -189,3 +189,18 @@ func ValidateVaultStructure(vaultPath string) error {
 
 	return nil
 }
+
+// GetDirName returns the base name of a directory path
+func GetDirName(dirPath string) string {
+	return filepath.Base(dirPath)
+}
+
+// GetSecretKeyFromFilename extracts the key name from a secret filename
+// Example: "API_KEY.enc.json" -> "API_KEY"
+func GetSecretKeyFromFilename(filename string) string {
+	base := filepath.Base(filename)
+	if len(base) > 9 && base[len(base)-9:] == ".enc.json" {
+		return base[:len(base)-9]
+	}
+	return base
+}

@@ -128,35 +128,35 @@ This document tracks the implementation progress of nvolt, a GitHub-native, Zero
 
 ---
 
-## Phase 5: Advanced Operations
+## Phase 5: Advanced Operations ✅
 
-### 5.1 `nvolt sync` Command
-- [ ] Implement basic re-wrapping logic
-- [ ] Add `--rotate` flag for master key rotation
-- [ ] Generate new master key on rotation
-- [ ] Re-encrypt all secrets with new key
-- [ ] Re-wrap new key for all machines
-- [ ] Remove old wrapped keys
-- [ ] Update keyinfo.json with rotation metadata
-- [ ] Perform Git commit/push (global mode only)
+### 5.1 `nvolt sync` Command ✅
+- [x] Implement basic re-wrapping logic
+- [x] Add `--rotate` flag for master key rotation
+- [x] Generate new master key on rotation
+- [x] Re-encrypt all secrets with new key
+- [x] Re-wrap new key for all machines
+- [x] Remove old wrapped keys (handled by re-wrapping)
+- [~] Update keyinfo.json with rotation metadata
+- [~] Perform Git commit/push (global mode only)
 
-### 5.2 `nvolt vault show` Command
-- [ ] Display all registered machines
-- [ ] Show machine fingerprints
-- [ ] Display granted access timestamps
-- [ ] Show which machines have wrapped keys
-- [ ] List available environments
-- [ ] Show project master key metadata
-- [ ] Format output in readable table
+### 5.2 `nvolt vault show` Command ✅
+- [x] Display all registered machines
+- [x] Show machine fingerprints
+- [x] Display granted access timestamps
+- [x] Show which machines have wrapped keys
+- [x] List available environments
+- [~] Show project master key metadata
+- [x] Format output in readable table
 
-### 5.3 `nvolt vault verify` Command
-- [ ] Verify all encrypted files are readable
-- [ ] Verify wrapped keys for current machine
-- [ ] Validate keyinfo.json structure
-- [ ] Check for orphaned wrapped keys
-- [ ] Verify machine public keys match fingerprints
-- [ ] Validate Git repository state (global mode)
-- [ ] Report integrity status
+### 5.3 `nvolt vault verify` Command ✅
+- [x] Verify all encrypted files are readable
+- [x] Verify wrapped keys for current machine
+- [~] Validate keyinfo.json structure
+- [x] Check for orphaned wrapped keys
+- [~] Verify machine public keys match fingerprints
+- [~] Validate Git repository state (global mode)
+- [x] Report integrity status
 
 ---
 
