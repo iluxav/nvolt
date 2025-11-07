@@ -1,0 +1,32 @@
+# Build artifacts
+bin/
+nvolt
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+*.coverprofile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+tmp/
+temp/
+
+# Local nvolt directories (for testing)
+.nvolt/
+test_vault/
