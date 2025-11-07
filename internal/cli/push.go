@@ -113,6 +113,8 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 	if err != nil {
 		return err
 	}
+	// Ensure master key is cleared from memory when done
+	defer crypto.ZeroBytes(masterKey)
 
 	if isNew {
 		fmt.Println("✓ Generated new master key")

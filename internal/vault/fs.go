@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io/fs"
 	"os"
@@ -80,16 +81,43 @@ func WriteFileAtomic(path string, data []byte, perm fs.FileMode) error {
 		return err
 	}
 
-	// Write to temporary file
+	// Write to temporary file with restrictive permissions
 	tmpPath := path + ".tmp"
 	if err := os.WriteFile(tmpPath, data, perm); err != nil {
 		return fmt.Errorf("failed to write temporary file: %w", err)
 	}
 
+	// Ensure correct permissions on temp file
+	if err := os.Chmod(tmpPath, perm); err != nil {
+		os.Remove(tmpPath) // Clean up on error
+		return fmt.Errorf("failed to set permissions on temporary file: %w", err)
+	}
+
 	// Rename to final path (atomic on most systems)
 	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath) // Clean up temp file on error
+		// Securely delete temp file on error
+		SecureDeleteFile(tmpPath)
 		return fmt.Errorf("failed to rename temporary file: %w", err)
+	}
+
+	// Verify final file permissions
+	if err := verifyFilePermissions(path, perm); err != nil {
+		return fmt.Errorf("file permissions verification failed: %w", err)
+	}
+
+	return nil
+}
+
+// verifyFilePermissions checks that a file has the expected permissions
+func verifyFilePermissions(path string, expectedPerm fs.FileMode) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	actualPerm := info.Mode().Perm()
+	if actualPerm != expectedPerm {
+		return fmt.Errorf("unexpected permissions: got %o, want %o", actualPerm, expectedPerm)
 	}
 
 	return nil
@@ -110,6 +138,46 @@ func DeleteFile(path string) error {
 		return fmt.Errorf("failed to delete file %s: %w", path, err)
 	}
 	return nil
+}
+
+// SecureDeleteFile securely deletes a file by overwriting it before removal
+// This helps prevent recovery of sensitive data from disk
+func SecureDeleteFile(path string) error {
+	// Get file size
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil // Already deleted
+	}
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	size := info.Size()
+	if size > 0 {
+		// Open file for writing
+		file, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			// If we can't overwrite, still try to delete
+			return os.Remove(path)
+		}
+		defer file.Close()
+
+		// Overwrite with random data
+		randomData := make([]byte, size)
+		if _, err := rand.Read(randomData); err == nil {
+			file.Write(randomData)
+			file.Sync()
+		}
+
+		// Overwrite with zeros
+		zeros := make([]byte, size)
+		file.Seek(0, 0)
+		file.Write(zeros)
+		file.Sync()
+	}
+
+	// Finally delete the file
+	return os.Remove(path)
 }
 
 // FileExists checks if a file exists

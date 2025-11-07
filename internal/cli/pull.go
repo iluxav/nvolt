@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
@@ -72,6 +73,8 @@ func runPull(environment, project string, write bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w\nMake sure you have pushed secrets first", err)
 	}
+	// Ensure master key is cleared from memory when done
+	defer crypto.ZeroBytes(masterKey)
 
 	// Get list of secret files for this environment
 	secretsDir := paths.GetSecretsPath(environment)

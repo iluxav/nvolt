@@ -24,7 +24,38 @@ func GenerateRSAKeypair() (*rsa.PrivateKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
 	}
+
+	// Validate key strength
+	if err := ValidateRSAKey(privateKey); err != nil {
+		return nil, fmt.Errorf("generated key failed validation: %w", err)
+	}
+
 	return privateKey, nil
+}
+
+// ValidateRSAKey validates that an RSA key meets security requirements
+func ValidateRSAKey(key *rsa.PrivateKey) error {
+	if key == nil {
+		return fmt.Errorf("key is nil")
+	}
+
+	// Check key size
+	keySize := key.N.BitLen()
+	if keySize < 2048 {
+		return fmt.Errorf("key size %d bits is too small (minimum 2048 bits required)", keySize)
+	}
+
+	// Verify public exponent is reasonable
+	if key.E < 3 || key.E > (1<<31-1) {
+		return fmt.Errorf("invalid public exponent: %d", key.E)
+	}
+
+	// Check that primes exist
+	if len(key.Primes) < 2 {
+		return fmt.Errorf("invalid number of primes: %d", len(key.Primes))
+	}
+
+	return nil
 }
 
 // EncodePrivateKeyPEM encodes a private key to PEM format

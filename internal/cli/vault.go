@@ -166,6 +166,26 @@ func runVaultVerify() error {
 		fmt.Printf("✓ Vault structure is valid\n")
 	}
 
+	// Check Git security
+	fmt.Printf("\nChecking Git security...\n")
+	if err := vault.EnsurePrivateKeysNotInGit(vaultPath); err != nil {
+		errors = append(errors, fmt.Sprintf("Private key security issue: %v", err))
+	} else {
+		fmt.Printf("✓ Private keys are not in Git repository\n")
+	}
+
+	// Check .gitignore for sensitive patterns
+	missing, err := vault.ValidateGitignore(vaultPath)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("Git ignore validation: %v", err))
+	} else if len(missing) > 0 {
+		for _, pattern := range missing {
+			warnings = append(warnings, fmt.Sprintf("Missing .gitignore pattern: %s", pattern))
+		}
+	} else {
+		fmt.Printf("✓ .gitignore properly configured for sensitive files\n")
+	}
+
 	// Check current machine
 	fmt.Printf("\nChecking current machine...\n")
 	currentMachine, err := vault.LoadMachineInfo()

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -68,6 +69,8 @@ func runWithSecrets(environment string, cmdArgs []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w", err)
 	}
+	// Ensure master key is cleared from memory when done
+	defer crypto.ZeroBytes(masterKey)
 
 	// Get list of secret files
 	secretsDir := paths.GetSecretsPath(environment)
