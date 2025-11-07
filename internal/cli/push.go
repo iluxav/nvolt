@@ -31,13 +31,18 @@ Examples:
 		project, _ := cmd.Flags().GetString("project")
 		keyValues, _ := cmd.Flags().GetStringSlice("key")
 		autoGrant, _ := cmd.Flags().GetBool("auto-grant")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-		return runPush(envFile, environment, project, keyValues, autoGrant)
+		return runPush(envFile, environment, project, keyValues, autoGrant, dryRun)
 	},
 }
 
-func runPush(envFile, environment, project string, keyValues []string, autoGrant bool) error {
-	fmt.Println("Pushing secrets to vault...")
+func runPush(envFile, environment, project string, keyValues []string, autoGrant, dryRun bool) error {
+	if dryRun {
+		fmt.Println("[DRY RUN] Simulating push operation...")
+	} else {
+		fmt.Println("Pushing secrets to vault...")
+	}
 
 	// Find vault path
 	vaultPath, err := findVaultPath()
@@ -148,8 +153,12 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 			return fmt.Errorf("failed to encrypt secret %s: %w", key, err)
 		}
 
-		if err := vault.SaveEncryptedSecret(paths, environment, key, encrypted); err != nil {
-			return fmt.Errorf("failed to save secret %s: %w", key, err)
+		if !dryRun {
+			if err := vault.SaveEncryptedSecret(paths, environment, key, encrypted); err != nil {
+				return fmt.Errorf("failed to save secret %s: %w", key, err)
+			}
+		} else {
+			fmt.Printf("  [DRY RUN] Would save secret: %s\n", key)
 		}
 	}
 
@@ -162,7 +171,7 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 	}
 
 	// Auto-commit and push in global mode
-	if vault.IsGlobalMode(vaultPath) {
+	if vault.IsGlobalMode(vaultPath) && !dryRun {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
 		fmt.Println("\nGlobal mode: committing and pushing changes...")
 
@@ -175,6 +184,12 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 		}
 
 		fmt.Println("✓ Changes committed and pushed to repository")
+	} else if vault.IsGlobalMode(vaultPath) && dryRun {
+		fmt.Println("\n[DRY RUN] Would commit and push changes to repository")
+	}
+
+	if dryRun {
+		fmt.Println("\n[DRY RUN] No changes were made")
 	}
 
 	return nil
@@ -249,5 +264,6 @@ func init() {
 	pushCmd.Flags().StringP("project", "p", "", "Project name (auto-detected if not specified)")
 	pushCmd.Flags().StringSliceP("key", "k", []string{}, "Key=value pairs (can be specified multiple times)")
 	pushCmd.Flags().Bool("auto-grant", false, "Automatically grant access to all machines without prompting")
+	pushCmd.Flags().Bool("dry-run", false, "Show what would be done without making any changes")
 	rootCmd.AddCommand(pushCmd)
 }

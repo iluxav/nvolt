@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +34,9 @@ This command will:
 }
 
 func runInit(repoSpec string) error {
-	fmt.Println("Initializing nvolt vault...")
+	// Show logo for first-time setup
+	ui.PrintBanner("Initializing nvolt vault...")
+	fmt.Println()
 
 	// Step 1: Ensure machine keypair exists
 	machineInitialized, err := vault.IsMachineInitialized()
