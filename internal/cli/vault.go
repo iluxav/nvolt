@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +46,9 @@ func runVaultShow() error {
 		return err
 	}
 
-	paths := vault.GetVaultPaths(vaultPath)
+	// TODO: In global mode with multiple projects, this should show project-specific info
+	// For now, we use empty project name which works for local mode
+	paths := vault.GetVaultPaths(vaultPath, "")
 
 	fmt.Printf("Vault Information\n")
 	fmt.Printf("=================\n\n")
@@ -66,7 +68,7 @@ func runVaultShow() error {
 	}
 
 	// List all machines
-	machines, err := vault.ListMachines(vaultPath)
+	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
@@ -127,7 +129,9 @@ func runVaultVerify() error {
 		return err
 	}
 
-	paths := vault.GetVaultPaths(vaultPath)
+	// TODO: In global mode with multiple projects, this should verify all projects
+	// For now, we use empty project name which works for local mode
+	paths := vault.GetVaultPaths(vaultPath, "")
 
 	fmt.Printf("Verifying Vault Integrity\n")
 	fmt.Printf("=========================\n\n")
@@ -152,7 +156,7 @@ func runVaultVerify() error {
 		fmt.Printf("✓ Current machine: %s\n", currentMachine.ID)
 
 		// Check if current machine can decrypt
-		_, err := vault.UnwrapMasterKey(vaultPath)
+		_, err := vault.UnwrapMasterKey(paths)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("Current machine cannot unwrap master key: %v", err))
 		} else {
@@ -162,7 +166,7 @@ func runVaultVerify() error {
 
 	// Check machines
 	fmt.Printf("\nChecking registered machines...\n")
-	machines, err := vault.ListMachines(vaultPath)
+	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Cannot list machines: %v", err))
 	} else {

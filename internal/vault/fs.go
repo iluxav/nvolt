@@ -24,7 +24,7 @@ func InitializeHomeDirectory() error {
 	dirs := []string{
 		homePaths.Root,
 		homePaths.Machines,
-		homePaths.Projects,
+		homePaths.Orgs,
 	}
 
 	for _, dir := range dirs {
@@ -38,7 +38,8 @@ func InitializeHomeDirectory() error {
 
 // InitializeVaultDirectory creates the .nvolt directory structure
 func InitializeVaultDirectory(vaultPath string) error {
-	paths := GetVaultPaths(vaultPath)
+	// Use empty project name - this initializes base structure
+	paths := GetVaultPaths(vaultPath, "")
 
 	dirs := []string{
 		paths.Root,
@@ -165,7 +166,8 @@ func EnsureSecretsDir(paths *Paths, environment string) error {
 
 // ValidateVaultStructure verifies that all required vault directories exist
 func ValidateVaultStructure(vaultPath string) error {
-	paths := GetVaultPaths(vaultPath)
+	// Use empty project name - this validates base structure
+	paths := GetVaultPaths(vaultPath, "")
 
 	requiredDirs := []string{
 		paths.Root,

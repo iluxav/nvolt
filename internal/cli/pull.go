@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/nvolt/nvolt/internal/git"
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +48,27 @@ func runPull(environment, project string, write bool) error {
 			return fmt.Errorf("failed to pull from repository: %w", err)
 		}
 		fmt.Println("✓ Repository up to date")
+
+		// Detect or use provided project name
+		if project == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
+			}
+			detectedProject, _, err := config.GetProjectName(cwd, "")
+			if err != nil {
+				return fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
+			}
+			project = detectedProject
+			fmt.Printf("Detected project: %s\n", project)
+		}
 	}
 
-	paths := vault.GetVaultPaths(vaultPath)
+	// Get vault paths with project name (empty for local mode)
+	paths := vault.GetVaultPaths(vaultPath, project)
 
 	// Unwrap master key
-	masterKey, err := vault.UnwrapMasterKey(vaultPath)
+	masterKey, err := vault.UnwrapMasterKey(paths)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w\nMake sure you have pushed secrets first", err)
 	}

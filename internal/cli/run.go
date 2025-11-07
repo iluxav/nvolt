@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -46,10 +47,24 @@ func runWithSecrets(environment string, cmdArgs []string) error {
 		return err
 	}
 
-	paths := vault.GetVaultPaths(vaultPath)
+	// Detect project name in global mode
+	var project string
+	if vault.IsGlobalMode(vaultPath) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		detectedProject, _, err := config.GetProjectName(cwd, "")
+		if err != nil {
+			return fmt.Errorf("failed to detect project name: %w", err)
+		}
+		project = detectedProject
+	}
+
+	paths := vault.GetVaultPaths(vaultPath, project)
 
 	// Unwrap master key
-	masterKey, err := vault.UnwrapMasterKey(vaultPath)
+	masterKey, err := vault.UnwrapMasterKey(paths)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w", err)
 	}

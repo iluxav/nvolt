@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nvolt/nvolt/pkg/types"
+	"github.com/iluxav/nvolt/pkg/types"
 )
 
 func TestGenerateMachineID(t *testing.T) {
@@ -90,20 +90,20 @@ func TestAddMachineToVault(t *testing.T) {
 	}
 
 	// Add machine
-	err = AddMachineToVault(vaultPath, machineInfo)
+	paths := GetVaultPaths(vaultPath, "")
+	err = AddMachineToVault(paths, machineInfo)
 	if err != nil {
 		t.Fatalf("Failed to add machine to vault: %v", err)
 	}
 
 	// Verify machine file exists
-	paths := GetVaultPaths(vaultPath)
 	machinePath := paths.GetMachineInfoPath(machineInfo.ID)
 	if !FileExists(machinePath) {
 		t.Error("Machine file was not created")
 	}
 
 	// Try to add same machine again (should fail)
-	err = AddMachineToVault(vaultPath, machineInfo)
+	err = AddMachineToVault(paths, machineInfo)
 	if err == nil {
 		t.Error("Expected error when adding duplicate machine")
 	}
@@ -127,19 +127,19 @@ func TestRemoveMachineFromVault(t *testing.T) {
 	}
 
 	// Add machine
-	err = AddMachineToVault(vaultPath, machineInfo)
+	paths := GetVaultPaths(vaultPath, "")
+	err = AddMachineToVault(paths, machineInfo)
 	if err != nil {
 		t.Fatalf("Failed to add machine: %v", err)
 	}
 
 	// Remove machine
-	err = RemoveMachineFromVault(vaultPath, machineInfo.ID)
+	err = RemoveMachineFromVault(paths, machineInfo.ID)
 	if err != nil {
 		t.Fatalf("Failed to remove machine: %v", err)
 	}
 
 	// Verify machine file is gone
-	paths := GetVaultPaths(vaultPath)
 	machinePath := paths.GetMachineInfoPath(machineInfo.ID)
 	if FileExists(machinePath) {
 		t.Error("Machine file still exists after removal")
@@ -178,15 +178,16 @@ func TestListMachines(t *testing.T) {
 		},
 	}
 
+	paths := GetVaultPaths(vaultPath, "")
 	for _, m := range machines {
-		err := AddMachineToVault(vaultPath, m)
+		err := AddMachineToVault(paths, m)
 		if err != nil {
 			t.Fatalf("Failed to add machine %s: %v", m.ID, err)
 		}
 	}
 
 	// List machines
-	listed, err := ListMachines(vaultPath)
+	listed, err := ListMachines(paths)
 	if err != nil {
 		t.Fatalf("Failed to list machines: %v", err)
 	}
@@ -225,7 +226,8 @@ func TestListMachinesEmptyVault(t *testing.T) {
 	}
 
 	// List machines (should be empty)
-	machines, err := ListMachines(vaultPath)
+	paths := GetVaultPaths(vaultPath, "")
+	machines, err := ListMachines(paths)
 	if err != nil {
 		t.Fatalf("Failed to list machines: %v", err)
 	}

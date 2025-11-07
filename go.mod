@@ -1,4 +1,4 @@
-module github.com/nvolt/nvolt
+module github.com/iluxav/nvolt
 
 go 1.24.3
 

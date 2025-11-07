@@ -223,7 +223,7 @@ func TestInitializeVaultDirectory(t *testing.T) {
 	}
 
 	// Verify all directories were created
-	paths := GetVaultPaths(vaultPath)
+	paths := GetVaultPaths(vaultPath, "")
 	requiredDirs := []string{
 		paths.Root,
 		paths.Secrets,
@@ -252,7 +252,7 @@ func TestEnsureSecretsDir(t *testing.T) {
 		t.Fatalf("Failed to initialize vault directory: %v", err)
 	}
 
-	paths := GetVaultPaths(vaultPath)
+	paths := GetVaultPaths(vaultPath, "")
 	environment := "production"
 
 	err = EnsureSecretsDir(paths, environment)

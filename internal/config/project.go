@@ -119,12 +119,9 @@ func detectFromGoMod(basePath string) (string, error) {
 			module := strings.TrimPrefix(line, "module ")
 			module = strings.TrimSpace(module)
 
-			// Extract last part of module path
-			// e.g., "github.com/user/project" -> "project"
-			parts := strings.Split(module, "/")
-			if len(parts) > 0 {
-				return sanitizeProjectName(parts[len(parts)-1]), nil
-			}
+			// Use full module path for uniqueness
+			// e.g., "github.com/iluxav/nvolt" -> "github.com-iluxav-nvolt"
+			return sanitizeProjectName(module), nil
 		}
 	}
 

@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"path/filepath"
 	"strings"
 )
 
@@ -11,7 +10,7 @@ type VaultMode int
 const (
 	// ModeLocal means vault is in current directory (./.nvolt)
 	ModeLocal VaultMode = iota
-	// ModeGlobal means vault is in a global repo (~/.nvolt/projects/org/repo/.nvolt)
+	// ModeGlobal means vault is in a global repo (~/.nvolt/orgs/org/repo)
 	ModeGlobal
 )
 
@@ -22,8 +21,8 @@ func GetVaultMode(vaultPath string) VaultMode {
 		return ModeLocal
 	}
 
-	// If vault path is under ~/.nvolt/projects/, it's global mode
-	if strings.HasPrefix(vaultPath, homePaths.Projects) {
+	// If vault path is under ~/.nvolt/orgs/, it's global mode
+	if strings.HasPrefix(vaultPath, homePaths.Orgs) {
 		return ModeGlobal
 	}
 
@@ -31,10 +30,10 @@ func GetVaultMode(vaultPath string) VaultMode {
 }
 
 // GetRepoPathFromVault extracts the repository path from a vault path
-// For example: ~/.nvolt/projects/org/repo/.nvolt -> ~/.nvolt/projects/org/repo
+// For global mode: ~/.nvolt/orgs/org/repo -> ~/.nvolt/orgs/org/repo
+// For local mode: returns the directory containing .nvolt
 func GetRepoPathFromVault(vaultPath string) string {
-	// Remove the .nvolt suffix
-	return filepath.Dir(vaultPath)
+	return GetRepoRootFromVault(vaultPath)
 }
 
 // IsGlobalMode checks if a vault path is in global mode

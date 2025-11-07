@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/nvolt/nvolt/internal/crypto"
-	"github.com/nvolt/nvolt/internal/git"
-	"github.com/nvolt/nvolt/internal/vault"
-	"github.com/nvolt/nvolt/pkg/types"
+	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -112,8 +112,9 @@ func runMachineAdd(machineName string) error {
 		CreatedAt:   time.Now(),
 	}
 
-	// Add to vault
-	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+	// Add to vault (machines are at root level, so use empty project name)
+	paths := vault.GetVaultPaths(vaultPath, "")
+	if err := vault.AddMachineToVault(paths, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
 
@@ -162,8 +163,9 @@ func runMachineRm(machineName string) error {
 		fmt.Println("✓ Pulled latest changes from repository")
 	}
 
-	// List all machines and find matching ones
-	machines, err := vault.ListMachines(vaultPath)
+	// List all machines and find matching ones (machines are at root level)
+	paths := vault.GetVaultPaths(vaultPath, "")
+	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
@@ -208,7 +210,7 @@ func runMachineRm(machineName string) error {
 	}
 
 	// Remove machine
-	if err := vault.RemoveMachineFromVault(vaultPath, machineID); err != nil {
+	if err := vault.RemoveMachineFromVault(paths, machineID); err != nil {
 		return fmt.Errorf("failed to remove machine: %w", err)
 	}
 
@@ -239,8 +241,9 @@ func runMachineList() error {
 		return err
 	}
 
-	// List machines
-	machines, err := vault.ListMachines(vaultPath)
+	// List machines (machines are at root level)
+	paths := vault.GetVaultPaths(vaultPath, "")
+	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
@@ -273,19 +276,19 @@ func findVaultPath() (string, error) {
 		return localPath, nil
 	}
 
-	// Try to find global vault in ~/.nvolt/projects
+	// Try to find global vault in ~/.nvolt/orgs
 	homePaths, err := vault.GetHomePaths()
 	if err != nil {
 		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
 	}
 
-	// Check if projects directory exists
-	if !vault.FileExists(homePaths.Projects) {
+	// Check if orgs directory exists
+	if !vault.FileExists(homePaths.Orgs) {
 		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
 	}
 
-	// Scan for vaults in ~/.nvolt/projects/org/repo/.nvolt
-	vaultPath, err := findGlobalVault(homePaths.Projects)
+	// Scan for vaults in ~/.nvolt/orgs/org/repo
+	vaultPath, err := findGlobalVault(homePaths.Orgs)
 	if err != nil {
 		return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
 	}
@@ -293,11 +296,12 @@ func findVaultPath() (string, error) {
 	return vaultPath, nil
 }
 
-// findGlobalVault searches for a vault in ~/.nvolt/projects/
-// Returns the first valid vault found in the structure: ~/.nvolt/projects/org/repo/.nvolt
-func findGlobalVault(projectsDir string) (string, error) {
-	// List all org directories in ~/.nvolt/projects
-	orgDirs, err := vault.ListDirs(projectsDir)
+// findGlobalVault searches for a vault in ~/.nvolt/orgs/
+// Returns the first valid repo root found in the structure: ~/.nvolt/orgs/org/repo
+// In global mode, the repo root contains machines/ directory at the top level
+func findGlobalVault(orgsDir string) (string, error) {
+	// List all org directories in ~/.nvolt/orgs
+	orgDirs, err := vault.ListDirs(orgsDir)
 	if err != nil {
 		return "", fmt.Errorf("no global vaults found")
 	}
@@ -309,11 +313,12 @@ func findGlobalVault(projectsDir string) (string, error) {
 			continue
 		}
 
-		// Check each repo for a .nvolt directory
+		// Check each repo for a machines/ directory (global mode indicator)
 		for _, repoDir := range repoDirs {
-			vaultPath := filepath.Join(repoDir, ".nvolt")
-			if vault.IsVaultInitialized(vaultPath) {
-				return vaultPath, nil
+			machinesPath := filepath.Join(repoDir, vault.MachinesDir)
+			if vault.FileExists(machinesPath) {
+				// This is a valid global vault
+				return repoDir, nil
 			}
 		}
 	}

@@ -1,11 +1,17 @@
 package cli
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
-	"github.com/nvolt/nvolt/internal/crypto"
-	"github.com/nvolt/nvolt/internal/git"
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -39,18 +45,34 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 		return err
 	}
 
-	// Pull latest changes in global mode BEFORE doing any work
-	// This ensures we have the latest machine keys from other machines
+	// Determine project name and get vault paths
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
+
+		// Pull latest changes BEFORE doing any work
 		fmt.Println("Global mode: pulling latest changes...")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
 		fmt.Println("✓ Pulled latest changes from repository")
+
+		// Detect or use provided project name
+		if project == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
+			}
+			detectedProject, _, err := config.GetProjectName(cwd, "")
+			if err != nil {
+				return fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
+			}
+			project = detectedProject
+			fmt.Printf("Detected project: %s\n", project)
+		}
 	}
 
-	paths := vault.GetVaultPaths(vaultPath)
+	// Get vault paths with unified logic (projectName is ignored in local mode)
+	paths := vault.GetVaultPaths(vaultPath, project)
 
 	// Collect secrets from file and/or command line
 	secrets := make(map[string]string)
@@ -87,7 +109,7 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	}
 
 	// Check if master key exists or generate new one
-	masterKey, isNew, err := getOrCreateMasterKey(vaultPath)
+	masterKey, isNew, err := getOrCreateMasterKey(paths)
 	if err != nil {
 		return err
 	}
@@ -107,7 +129,7 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	// ALWAYS wrap master key for all machines (not just when new)
 	// This ensures newly added machines get access to the master key
 	fmt.Println("Wrapping master key for all machines...")
-	if err := vault.WrapMasterKeyForMachines(vaultPath, masterKey, machineInfo.ID); err != nil {
+	if err := wrapMasterKeyForMachines(paths, masterKey, machineInfo.ID); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
 	}
 	fmt.Println("✓ Master key wrapped for all machines")
@@ -139,10 +161,10 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 		fmt.Println("\nGlobal mode: committing and pushing changes...")
 
 		// Generate commit message
-		commitMsg := fmt.Sprintf("Update secrets for environment '%s'", environment)
+		commitMsg := fmt.Sprintf("Update secrets for project '%s' environment '%s'", project, environment)
 
-		// Commit and push
-		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+		// Commit and push project directory (not .nvolt which doesn't exist in global mode)
+		if err := git.CommitAndPush(repoPath, commitMsg, project, "machines"); err != nil {
 			return fmt.Errorf("failed to commit and push changes: %w", err)
 		}
 
@@ -153,9 +175,9 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 }
 
 // getOrCreateMasterKey gets the existing master key or creates a new one
-func getOrCreateMasterKey(vaultPath string) ([]byte, bool, error) {
+func getOrCreateMasterKey(paths *vault.Paths) ([]byte, bool, error) {
 	// Try to unwrap existing master key
-	masterKey, err := vault.UnwrapMasterKey(vaultPath)
+	masterKey, err := unwrapMasterKey(paths)
 	if err == nil {
 		return masterKey, false, nil
 	}
@@ -167,6 +189,88 @@ func getOrCreateMasterKey(vaultPath string) ([]byte, bool, error) {
 	}
 
 	return masterKey, true, nil
+}
+
+// unwrapMasterKey attempts to load and unwrap the master key for the current machine
+func unwrapMasterKey(paths *vault.Paths) ([]byte, error) {
+	// Get current machine ID
+	machineID, err := vault.GetCurrentMachineID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current machine ID: %w", err)
+	}
+
+	// Load wrapped key
+	wrappedKeyPath := paths.GetWrappedKeyPath(machineID)
+	data, err := vault.ReadFile(wrappedKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read wrapped key: %w (machine may not have access)", err)
+	}
+
+	var wrappedKeyData types.WrappedKey
+	if err := json.Unmarshal(data, &wrappedKeyData); err != nil {
+		return nil, fmt.Errorf("failed to parse wrapped key: %w", err)
+	}
+
+	// Load private key
+	privateKey, err := vault.LoadPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load private key: %w", err)
+	}
+
+	// Unwrap master key
+	wrappedKey, err := base64.StdEncoding.DecodeString(wrappedKeyData.WrappedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode wrapped key: %w", err)
+	}
+
+	masterKey, err := crypto.UnwrapKey(privateKey, wrappedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unwrap master key: %w", err)
+	}
+
+	return masterKey, nil
+}
+
+// wrapMasterKeyForMachines wraps the master key for all machines in the vault
+func wrapMasterKeyForMachines(paths *vault.Paths, masterKey []byte, grantedBy string) error {
+	// List all machines
+	machines, err := vault.ListMachines(paths)
+	if err != nil {
+		return fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	// Wrap key for each machine
+	for _, machine := range machines {
+		publicKey, err := crypto.DecodePublicKeyPEM([]byte(machine.PublicKey))
+		if err != nil {
+			return fmt.Errorf("failed to decode public key for %s: %w", machine.ID, err)
+		}
+
+		wrappedKey, err := crypto.WrapKey(publicKey, masterKey)
+		if err != nil {
+			return fmt.Errorf("failed to wrap key for %s: %w", machine.ID, err)
+		}
+
+		wrappedKeyData := &types.WrappedKey{
+			MachineID:            machine.ID,
+			PublicKeyFingerprint: machine.Fingerprint,
+			WrappedKey:           base64.StdEncoding.EncodeToString(wrappedKey),
+			GrantedBy:            grantedBy,
+			GrantedAt:            time.Now(),
+		}
+
+		data, err := json.MarshalIndent(wrappedKeyData, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal wrapped key for %s: %w", machine.ID, err)
+		}
+
+		wrappedKeyPath := paths.GetWrappedKeyPath(machine.ID)
+		if err := vault.WriteFileAtomic(wrappedKeyPath, data, vault.FilePerm); err != nil {
+			return fmt.Errorf("failed to save wrapped key for %s: %w", machine.ID, err)
+		}
+	}
+
+	return nil
 }
 
 func init() {

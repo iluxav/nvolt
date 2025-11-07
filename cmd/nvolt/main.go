@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nvolt/nvolt/internal/cli"
+	"github.com/iluxav/nvolt/internal/cli"
 )
 
 func main() {

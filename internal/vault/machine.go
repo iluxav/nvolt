@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/nvolt/nvolt/internal/crypto"
-	"github.com/nvolt/nvolt/pkg/types"
+	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/pkg/types"
 )
 
 // InitializeMachine creates a new machine keypair and stores it in ~/.nvolt
@@ -174,8 +174,13 @@ func GenerateMachineID(hostname, fingerprint string) string {
 }
 
 // AddMachineToVault adds a new machine's public key to the vault
-func AddMachineToVault(vaultPath string, machineInfo *types.MachineInfo) error {
-	paths := GetVaultPaths(vaultPath)
+// Uses unified paths - works identically in both local and global modes
+func AddMachineToVault(paths *Paths, machineInfo *types.MachineInfo) error {
+	// Ensure machines directory exists
+	if err := ensureDir(paths.Machines, DirPerm); err != nil {
+		return fmt.Errorf("failed to create machines directory: %w", err)
+	}
+
 	machinePath := paths.GetMachineInfoPath(machineInfo.ID)
 
 	// Check if machine already exists
@@ -187,11 +192,11 @@ func AddMachineToVault(vaultPath string, machineInfo *types.MachineInfo) error {
 }
 
 // RemoveMachineFromVault removes a machine from the vault
-func RemoveMachineFromVault(vaultPath string, machineID string) error {
-	paths := GetVaultPaths(vaultPath)
+// Uses unified paths - works identically in both local and global modes
+func RemoveMachineFromVault(paths *Paths, machineID string) error {
+	machinePath := paths.GetMachineInfoPath(machineID)
 
 	// Remove machine info
-	machinePath := paths.GetMachineInfoPath(machineID)
 	if err := DeleteFile(machinePath); err != nil {
 		return fmt.Errorf("failed to remove machine info: %w", err)
 	}
@@ -199,16 +204,18 @@ func RemoveMachineFromVault(vaultPath string, machineID string) error {
 	// Remove wrapped key
 	wrappedKeyPath := paths.GetWrappedKeyPath(machineID)
 	if err := DeleteFile(wrappedKeyPath); err != nil {
-		return fmt.Errorf("failed to remove wrapped key: %w", err)
+		// Wrapped key might not exist, that's okay
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove wrapped key: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // ListMachines lists all machines in the vault
-func ListMachines(vaultPath string) ([]*types.MachineInfo, error) {
-	paths := GetVaultPaths(vaultPath)
-
+// Uses unified paths - works identically in both local and global modes
+func ListMachines(paths *Paths) ([]*types.MachineInfo, error) {
 	files, err := ListFiles(paths.Machines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list machines: %w", err)

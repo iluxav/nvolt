@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
-	"github.com/nvolt/nvolt/internal/git"
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ Global mode (dedicated GitHub repo):
 This command will:
 - Generate an RSA/Ed25519 keypair for this machine (if not exists)
 - Create .nvolt/ directory structure
-- Clone the repo (if --repo provided) into ~/.nvolt/projects/`,
+- Clone the repo (if --repo provided) into ~/.nvolt/orgs/`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repo, _ := cmd.Flags().GetString("repo")
 
@@ -89,13 +90,13 @@ func initLocalMode() error {
 		fmt.Printf("\n✓ Vault already initialized at %s\n", vaultPath)
 
 		// Check if current machine is already in the vault
-		paths := vault.GetVaultPaths(vaultPath)
+		paths := vault.GetVaultPaths(vaultPath, "")
 		machinePath := paths.GetMachineInfoPath(machineInfo.ID)
 		if vault.FileExists(machinePath) {
 			fmt.Printf("✓ Machine %s already registered in vault\n", machineInfo.ID)
 		} else {
 			// Add current machine to existing vault
-			if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+			if err := vault.AddMachineToVault(paths, machineInfo); err != nil {
 				return fmt.Errorf("failed to add machine to vault: %w", err)
 			}
 			fmt.Printf("✓ Added machine %s to vault\n", machineInfo.ID)
@@ -115,7 +116,8 @@ func initLocalMode() error {
 	}
 
 	// Add current machine to vault
-	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+	paths := vault.GetVaultPaths(vaultPath, "")
+	if err := vault.AddMachineToVault(paths, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
 
@@ -151,9 +153,8 @@ func initGlobalMode(repoSpec string) error {
 		return err
 	}
 
-	// Determine target path
-	repoPath := filepath.Join(homePaths.Projects, org, repo)
-	vaultPath := filepath.Join(repoPath, vault.NvoltDir)
+	// Determine repo root path (no .nvolt subdirectory in global mode)
+	repoPath := filepath.Join(homePaths.Orgs, org, repo)
 
 	// Load current machine info
 	machineInfo, err := vault.LoadMachineInfo()
@@ -161,43 +162,53 @@ func initGlobalMode(repoSpec string) error {
 		return fmt.Errorf("failed to load machine info: %w", err)
 	}
 
-	// Check if already cloned
-	vaultExists := vault.IsVaultInitialized(vaultPath)
-	if vaultExists {
+	// Check if repository already exists
+	repoExists := git.IsGitRepo(repoPath)
+	if repoExists {
 		fmt.Printf("✓ Repository already cloned at %s\n", repoPath)
 
-		// Check if current machine is already in the vault
-		paths := vault.GetVaultPaths(vaultPath)
-		machinePath := paths.GetMachineInfoPath(machineInfo.ID)
+		// Check if machines directory exists
+		machinesDir := filepath.Join(repoPath, vault.MachinesDir)
+		if !vault.FileExists(machinesDir) {
+			// Initialize machines directory
+			if err := os.MkdirAll(machinesDir, vault.DirPerm); err != nil {
+				return fmt.Errorf("failed to create machines directory: %w", err)
+			}
+		}
+
+		// Check if current machine is already registered
+		machinePath := filepath.Join(machinesDir, fmt.Sprintf("%s.json", machineInfo.ID))
 		machineExists := vault.FileExists(machinePath)
 
 		if machineExists {
 			fmt.Printf("✓ Machine %s already registered in vault\n", machineInfo.ID)
 		} else {
-			// Add current machine to existing vault
-			if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+			// Add current machine (use empty project name for machines at root level)
+			paths := vault.GetVaultPaths(repoPath, "")
+			if err := vault.AddMachineToVault(paths, machineInfo); err != nil {
 				return fmt.Errorf("failed to add machine to vault: %w", err)
 			}
 			fmt.Printf("✓ Added machine %s to vault\n", machineInfo.ID)
 		}
 
-		// Check if there are uncommitted changes (machine might exist but not be committed)
+		// Check if there are uncommitted changes
 		hasChanges, err := git.HasUncommittedChanges(repoPath)
 		if err == nil && hasChanges {
 			// Commit and push the machine
 			fmt.Println("\nCommitting machine to repository...")
 			commitMsg := fmt.Sprintf("Add machine %s to vault", machineInfo.ID)
-			if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+			if err := git.CommitAndPush(repoPath, commitMsg, "machines"); err != nil {
 				return fmt.Errorf("failed to commit and push machine: %w", err)
 			}
 			fmt.Println("✓ Machine committed and pushed to repository")
 		}
 
 		fmt.Println("\nYou can now:")
-		fmt.Println("  - Push secrets: nvolt push -f .env")
-		fmt.Println("  - Pull secrets: nvolt pull")
+		fmt.Println("  - Push secrets: nvolt push -f .env -p <project-name>")
+		fmt.Println("  - Pull secrets: nvolt pull -p <project-name>")
 		fmt.Println("  - Add machines: nvolt machine add <name>")
-		fmt.Println("\nNote: nvolt will automatically commit and push changes to the repository.")
+		fmt.Println("\nNote: In global mode, use -p flag to specify project name.")
+		fmt.Println("      nvolt will automatically commit and push changes to the repository.")
 
 		return nil
 	}
@@ -215,33 +226,33 @@ func initGlobalMode(repoSpec string) error {
 
 	fmt.Printf("✓ Repository cloned to %s\n", repoPath)
 
-	// Initialize vault if .nvolt doesn't exist in repo
-	if !vault.IsVaultInitialized(vaultPath) {
-		fmt.Println("Initializing vault structure in repository...")
-		if err := vault.InitializeVaultDirectory(vaultPath); err != nil {
-			return fmt.Errorf("failed to initialize vault directory: %w", err)
-		}
+	// Initialize machines directory at repo root
+	machinesDir := filepath.Join(repoPath, vault.MachinesDir)
+	if err := os.MkdirAll(machinesDir, vault.DirPerm); err != nil {
+		return fmt.Errorf("failed to create machines directory: %w", err)
 	}
 
-	// Add current machine to vault
-	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+	// Add current machine to vault (use empty project name for machines at root level)
+	paths := vault.GetVaultPaths(repoPath, "")
+	if err := vault.AddMachineToVault(paths, machineInfo); err != nil {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
 
 	// Commit and push the machine's public key to repository
 	fmt.Println("\nCommitting machine to repository...")
 	commitMsg := fmt.Sprintf("Add machine %s to vault", machineInfo.ID)
-	if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
+	if err := git.CommitAndPush(repoPath, commitMsg, "machines"); err != nil {
 		return fmt.Errorf("failed to commit and push machine: %w", err)
 	}
 	fmt.Println("✓ Machine committed and pushed to repository")
 
 	fmt.Println("\n✓ Global vault initialized successfully")
 	fmt.Println("\nYou can now:")
-	fmt.Println("  - Push secrets: nvolt push -f .env")
-	fmt.Println("  - Pull secrets: nvolt pull")
+	fmt.Println("  - Push secrets: nvolt push -f .env -p <project-name>")
+	fmt.Println("  - Pull secrets: nvolt pull -p <project-name>")
 	fmt.Println("  - Add machines: nvolt machine add <name>")
-	fmt.Println("\nNote: nvolt will automatically commit and push changes to the repository.")
+	fmt.Println("\nNote: In global mode, use -p flag to specify project name.")
+	fmt.Println("      nvolt will automatically commit and push changes to the repository.")
 
 	return nil
 }

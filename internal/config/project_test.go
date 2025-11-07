@@ -70,8 +70,9 @@ go 1.21`
 		t.Fatalf("Failed to detect from go.mod: %v", err)
 	}
 
-	if name != "awesome-project" {
-		t.Errorf("Expected 'awesome-project', got '%s'", name)
+	// Should return full sanitized module path
+	if name != "github-com-user-awesome-project" {
+		t.Errorf("Expected 'github-com-user-awesome-project', got '%s'", name)
 	}
 }
 

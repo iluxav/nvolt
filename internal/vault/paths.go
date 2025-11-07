@@ -18,7 +18,7 @@ const (
 	SecretsDir     = "secrets"
 	WrappedKeysDir = "wrapped_keys"
 	MachinesDir    = "machines"
-	ProjectsDir    = "projects"
+	OrgsDir        = "orgs"
 
 	// Files
 	PrivateKeyFile  = "private_key.pem"
@@ -29,7 +29,7 @@ const (
 
 // Paths holds all vault-related paths
 type Paths struct {
-	// Root is the root directory of the vault (.nvolt or ~/.nvolt/projects/org/repo)
+	// Root is the root directory of the vault (.nvolt or ~/.nvolt/orgs/org/repo)
 	Root string
 
 	// Secrets directory
@@ -62,8 +62,8 @@ type HomePaths struct {
 	// Machines directory for storing machine public keys
 	Machines string
 
-	// Projects directory for global repos
-	Projects string
+	// Orgs directory for organization repos
+	Orgs string
 }
 
 // GetHomePaths returns the home directory paths
@@ -95,21 +95,48 @@ func GetHomePaths() (*HomePaths, error) {
 		PrivateKey:  filepath.Join(root, PrivateKeyFile),
 		MachineInfo: filepath.Join(root, MachinesDir, MachineInfoFile),
 		Machines:    filepath.Join(root, MachinesDir),
-		Projects:    filepath.Join(root, ProjectsDir),
+		Orgs:        filepath.Join(root, OrgsDir),
 	}, nil
 }
 
-// GetVaultPaths returns the vault directory paths
-func GetVaultPaths(vaultRoot string) *Paths {
+// GetVaultPaths returns the vault directory paths using unified prefix logic
+// For local mode: vaultRoot = ./.nvolt, projectName is ignored
+//   - machine_prefix = ".nvolt"
+//   - secret_prefix = ".nvolt"
+//   - keys_prefix = ".nvolt"
+// For global mode: vaultRoot = ~/.nvolt/orgs/org/repo, projectName is required
+//   - machine_prefix = "" (machines at root)
+//   - secret_prefix = projectName
+//   - keys_prefix = projectName
+//
+// The code remains identical regardless of mode, only prefixes change.
+func GetVaultPaths(vaultRoot, projectName string) *Paths {
+	mode := GetVaultMode(vaultRoot)
+
+	var machinePrefix, secretPrefix, keysPrefix string
+
+	if mode == ModeLocal {
+		// Local mode: everything under .nvolt/
+		machinePrefix = NvoltDir
+		secretPrefix = NvoltDir
+		keysPrefix = NvoltDir
+	} else {
+		// Global mode: machines at root, secrets/keys under project
+		machinePrefix = ""
+		secretPrefix = projectName
+		keysPrefix = projectName
+	}
+
 	return &Paths{
 		Root:        vaultRoot,
-		Secrets:     filepath.Join(vaultRoot, SecretsDir),
-		WrappedKeys: filepath.Join(vaultRoot, WrappedKeysDir),
-		Machines:    filepath.Join(vaultRoot, MachinesDir),
-		KeyInfo:     filepath.Join(vaultRoot, KeyInfoFile),
-		Config:      filepath.Join(vaultRoot, ConfigFile),
+		Machines:    filepath.Join(vaultRoot, machinePrefix, MachinesDir),
+		Secrets:     filepath.Join(vaultRoot, secretPrefix, SecretsDir),
+		WrappedKeys: filepath.Join(vaultRoot, keysPrefix, WrappedKeysDir),
+		KeyInfo:     filepath.Join(vaultRoot, secretPrefix, KeyInfoFile),
+		Config:      filepath.Join(vaultRoot, secretPrefix, ConfigFile),
 	}
 }
+
 
 // GetLocalVaultPath returns the vault path in the current directory
 func GetLocalVaultPath() (string, error) {
@@ -121,14 +148,15 @@ func GetLocalVaultPath() (string, error) {
 }
 
 // GetGlobalVaultPath returns the vault path for a global repo
-func GetGlobalVaultPath(org, repo string) (*Paths, error) {
+// Returns the repo root path, not a .nvolt subdirectory
+func GetGlobalVaultPath(org, repo string) (string, error) {
 	homePaths, err := GetHomePaths()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	vaultRoot := filepath.Join(homePaths.Projects, org, repo, NvoltDir)
-	return GetVaultPaths(vaultRoot), nil
+	repoRoot := filepath.Join(homePaths.Orgs, org, repo)
+	return repoRoot, nil
 }
 
 // GetSecretsPath returns the path for an environment's secrets
@@ -177,3 +205,19 @@ func IsMachineInitialized() (bool, error) {
 
 	return true, nil
 }
+
+// GetRepoRootFromVault extracts the repo root path from a vault path
+// For local mode: returns the directory containing .nvolt
+// For global mode: returns the repo root (e.g., ~/.nvolt/orgs/org/repo)
+func GetRepoRootFromVault(vaultPath string) string {
+	vaultPath = filepath.Clean(vaultPath)
+
+	// If this is a local vault (.nvolt), return parent directory
+	if filepath.Base(vaultPath) == NvoltDir {
+		return filepath.Dir(vaultPath)
+	}
+
+	// For global mode, the vaultPath IS the repo root
+	return vaultPath
+}
+

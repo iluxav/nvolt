@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/nvolt/nvolt/internal/crypto"
-	"github.com/nvolt/nvolt/pkg/types"
+	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/pkg/types"
 )
 
 // ParseEnvFile parses a .env file into a map of key-value pairs
@@ -162,11 +162,10 @@ func LoadEncryptedSecret(paths *Paths, environment, key string) (*types.Encrypte
 }
 
 // WrapMasterKeyForMachines wraps the master key for all machines in the vault
-func WrapMasterKeyForMachines(vaultPath string, masterKey []byte, grantedBy string) error {
-	paths := GetVaultPaths(vaultPath)
-
+// Uses unified paths - works identically in both local and global modes
+func WrapMasterKeyForMachines(paths *Paths, masterKey []byte, grantedBy string) error {
 	// Get all machines
-	machines, err := ListMachines(vaultPath)
+	machines, err := ListMachines(paths)
 	if err != nil {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
@@ -214,8 +213,8 @@ func WrapMasterKeyForMachines(vaultPath string, masterKey []byte, grantedBy stri
 }
 
 // UnwrapMasterKey unwraps the master key for the current machine
-func UnwrapMasterKey(vaultPath string) ([]byte, error) {
-	paths := GetVaultPaths(vaultPath)
+// Uses unified paths - works identically in both local and global modes
+func UnwrapMasterKey(paths *Paths) ([]byte, error) {
 
 	// Get current machine ID
 	machineID, err := GetCurrentMachineID()

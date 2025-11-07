@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/nvolt/nvolt/internal/crypto"
-	"github.com/nvolt/nvolt/internal/git"
-	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -49,13 +49,17 @@ func runSync(rotate bool) error {
 		return fmt.Errorf("failed to load machine info: %w", err)
 	}
 
+	// TODO: In global mode with multiple projects, this should sync all projects
+	// For now, we use empty project name which works for local mode
+	paths := vault.GetVaultPaths(vaultPath, "")
+
 	var masterKey []byte
 
 	if rotate {
 		fmt.Println("Rotating master key...")
 
 		// Load existing master key first to re-encrypt secrets
-		oldMasterKey, err := vault.UnwrapMasterKey(vaultPath)
+		oldMasterKey, err := vault.UnwrapMasterKey(paths)
 		if err != nil {
 			return fmt.Errorf("failed to unwrap old master key: %w", err)
 		}
@@ -76,7 +80,7 @@ func runSync(rotate bool) error {
 		fmt.Println("Re-wrapping master key for all machines...")
 
 		// Load existing master key
-		masterKey, err = vault.UnwrapMasterKey(vaultPath)
+		masterKey, err = vault.UnwrapMasterKey(paths)
 		if err != nil {
 			return fmt.Errorf("failed to unwrap master key: %w", err)
 		}
@@ -85,12 +89,12 @@ func runSync(rotate bool) error {
 	}
 
 	// Wrap master key for all machines
-	if err := vault.WrapMasterKeyForMachines(vaultPath, masterKey, machineInfo.ID); err != nil {
+	if err := vault.WrapMasterKeyForMachines(paths, masterKey, machineInfo.ID); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
 	}
 
 	// List machines to show what was done
-	machines, err := vault.ListMachines(vaultPath)
+	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
@@ -132,7 +136,9 @@ func runSync(rotate bool) error {
 
 // rotateSecretsEncryption re-encrypts all secrets with a new master key
 func rotateSecretsEncryption(vaultPath string, oldKey, newKey []byte) error {
-	paths := vault.GetVaultPaths(vaultPath)
+	// TODO: In global mode with multiple projects, this should rotate all projects
+	// For now, we use empty project name which works for local mode
+	paths := vault.GetVaultPaths(vaultPath, "")
 
 	// Get all environment directories
 	envDirs, err := vault.ListDirs(paths.Secrets)
