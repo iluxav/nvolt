@@ -2,7 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/nvolt/nvolt/internal/crypto"
+	"github.com/nvolt/nvolt/internal/vault"
+	"github.com/nvolt/nvolt/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -23,11 +27,7 @@ Example:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		machineName := args[0]
-
-		// TODO: Implement machine add logic
-		fmt.Printf("Adding machine: %s\n", machineName)
-
-		return fmt.Errorf("not yet implemented")
+		return runMachineAdd(machineName)
 	},
 }
 
@@ -42,11 +42,7 @@ Example:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		machineName := args[0]
-
-		// TODO: Implement machine remove logic
-		fmt.Printf("Removing machine: %s\n", machineName)
-
-		return fmt.Errorf("not yet implemented")
+		return runMachineRm(machineName)
 	},
 }
 
@@ -55,11 +51,150 @@ var machineListCmd = &cobra.Command{
 	Short: "List all machines with access",
 	Long:  `Display all machines that have access to the vault.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: Implement machine list logic
-		fmt.Printf("Listing machines...\n")
-
-		return fmt.Errorf("not yet implemented")
+		return runMachineList()
 	},
+}
+
+func runMachineAdd(machineName string) error {
+	fmt.Printf("Adding machine: %s\n", machineName)
+
+	// Find vault path (local or global)
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return err
+	}
+
+	// Generate keypair for new machine
+	fmt.Println("Generating keypair...")
+	privateKey, err := crypto.GenerateRSAKeypair()
+	if err != nil {
+		return fmt.Errorf("failed to generate keypair: %w", err)
+	}
+
+	publicKey := &privateKey.PublicKey
+
+	// Encode keys
+	privateKeyPEM, err := crypto.EncodePrivateKeyPEM(privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to encode private key: %w", err)
+	}
+
+	publicKeyPEM, err := crypto.EncodePublicKeyPEM(publicKey)
+	if err != nil {
+		return fmt.Errorf("failed to encode public key: %w", err)
+	}
+
+	fingerprint, err := crypto.GenerateFingerprint(publicKey)
+	if err != nil {
+		return fmt.Errorf("failed to generate fingerprint: %w", err)
+	}
+
+	// Create machine info
+	machineID := vault.GenerateMachineID(machineName)
+	machineInfo := &types.MachineInfo{
+		ID:          machineID,
+		PublicKey:   string(publicKeyPEM),
+		Fingerprint: fingerprint,
+		Hostname:    machineName,
+		Description: fmt.Sprintf("Machine: %s", machineName),
+		CreatedAt:   time.Now(),
+	}
+
+	// Add to vault
+	if err := vault.AddMachineToVault(vaultPath, machineInfo); err != nil {
+		return fmt.Errorf("failed to add machine to vault: %w", err)
+	}
+
+	fmt.Printf("\n✓ Machine added successfully\n")
+	fmt.Printf("  Machine ID: %s\n", machineID)
+	fmt.Printf("  Fingerprint: %s\n", fingerprint)
+	fmt.Printf("\nPrivate key (save this securely for the new machine):\n")
+	fmt.Printf("---\n%s---\n", string(privateKeyPEM))
+	fmt.Printf("\nTo use this machine:\n")
+	fmt.Printf("1. Save the private key to ~/.nvolt/private_key.pem on the target machine\n")
+	fmt.Printf("2. Set permissions: chmod 600 ~/.nvolt/private_key.pem\n")
+	fmt.Printf("3. Save the machine info to ~/.nvolt/machines/machine-info.json\n")
+
+	return nil
+}
+
+func runMachineRm(machineName string) error {
+	fmt.Printf("Removing machine: %s\n", machineName)
+
+	// Find vault path
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return err
+	}
+
+	// Convert name to machine ID
+	machineID := vault.GenerateMachineID(machineName)
+
+	// Confirm removal
+	fmt.Printf("Are you sure you want to remove machine %s? This cannot be undone. (yes/no): ", machineID)
+	var response string
+	fmt.Scanln(&response)
+	if response != "yes" {
+		fmt.Println("Aborted.")
+		return nil
+	}
+
+	// Remove machine
+	if err := vault.RemoveMachineFromVault(vaultPath, machineID); err != nil {
+		return fmt.Errorf("failed to remove machine: %w", err)
+	}
+
+	fmt.Printf("✓ Machine %s removed successfully\n", machineID)
+	fmt.Println("\nNote: You should re-wrap the master key using 'nvolt sync' to ensure")
+	fmt.Println("the removed machine cannot decrypt new secrets.")
+
+	return nil
+}
+
+func runMachineList() error {
+	// Find vault path
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return err
+	}
+
+	// List machines
+	machines, err := vault.ListMachines(vaultPath)
+	if err != nil {
+		return fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	if len(machines) == 0 {
+		fmt.Println("No machines found in vault.")
+		return nil
+	}
+
+	fmt.Printf("Machines (%d):\n\n", len(machines))
+	for _, m := range machines {
+		fmt.Printf("  ID:          %s\n", m.ID)
+		fmt.Printf("  Hostname:    %s\n", m.Hostname)
+		fmt.Printf("  Fingerprint: %s\n", m.Fingerprint)
+		fmt.Printf("  Created:     %s\n", m.CreatedAt.Format(time.RFC3339))
+		if m.Description != "" {
+			fmt.Printf("  Description: %s\n", m.Description)
+		}
+		fmt.Println()
+	}
+
+	return nil
+}
+
+// findVaultPath tries to find the vault in local or global mode
+func findVaultPath() (string, error) {
+	// Try local mode first
+	localPath, err := vault.GetLocalVaultPath()
+	if err == nil && vault.IsVaultInitialized(localPath) {
+		return localPath, nil
+	}
+
+	// TODO: Support finding global vault
+	// For now, just return error if local vault not found
+	return "", fmt.Errorf("vault not found. Run 'nvolt init' first")
 }
 
 func init() {

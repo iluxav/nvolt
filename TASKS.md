@@ -36,54 +36,54 @@ This document tracks the implementation progress of nvolt, a GitHub-native, Zero
 
 ---
 
-## Phase 2: Core Commands - Machine & Key Management
+## Phase 2: Core Commands - Machine & Key Management 🚧
 
-### 2.1 `nvolt init` Command
-- [ ] Parse `--repo` flag for global/local mode detection
-- [ ] Implement local mode initialization (`./.nvolt/`)
-- [ ] Implement global mode initialization (`~/.nvolt/projects/`)
-- [ ] Generate machine keypair on first init
-- [ ] Create machine info file (`~/.nvolt/machines/machine-info.json`)
-- [ ] Implement Git clone for global repos
-- [ ] Add validation for existing vaults
-- [ ] Handle initialization errors gracefully
+### 2.1 `nvolt init` Command ✅
+- [x] Parse `--repo` flag for global/local mode detection
+- [x] Implement local mode initialization (`./.nvolt/`)
+- [x] Implement global mode initialization (`~/.nvolt/projects/`)
+- [x] Generate machine keypair on first init
+- [x] Create machine info file (`~/.nvolt/machines/machine-info.json`)
+- [x] Implement Git clone for global repos
+- [x] Add validation for existing vaults
+- [x] Handle initialization errors gracefully
 
-### 2.2 `nvolt machine add` Command
-- [ ] Generate new keypair for specified machine
-- [ ] Create machine metadata JSON
-- [ ] Store public key in `.nvolt/machines/<name>.json`
-- [ ] Export private key for manual transfer
-- [ ] Add machine fingerprint calculation
-- [ ] Implement machine naming validation
-- [ ] Add duplicate machine detection
+### 2.2 `nvolt machine add` Command ✅
+- [x] Generate new keypair for specified machine
+- [x] Create machine metadata JSON
+- [x] Store public key in `.nvolt/machines/<name>.json`
+- [x] Export private key for manual transfer
+- [x] Add machine fingerprint calculation
+- [x] Implement machine naming validation
+- [x] Add duplicate machine detection
 
-### 2.3 `nvolt machine rm` Command
-- [ ] Remove machine from `.nvolt/machines/`
-- [ ] Remove machine's wrapped key from `.nvolt/wrapped_keys/`
-- [ ] Trigger automatic key re-wrapping
-- [ ] Update access logs
-- [ ] Add confirmation prompt
-- [ ] Handle last-machine removal protection
+### 2.3 `nvolt machine rm` Command ✅
+- [x] Remove machine from `.nvolt/machines/`
+- [x] Remove machine's wrapped key from `.nvolt/wrapped_keys/`
+- [~] Trigger automatic key re-wrapping
+- [~] Update access logs
+- [x] Add confirmation prompt
+- [~] Handle last-machine removal protection
 
 ---
 
-## Phase 3: Project Detection & Context
+## Phase 3: Project Detection & Context ✅
 
-### 3.1 Automatic Project Name Detection
-- [ ] Implement `package.json` parser (Node.js)
-- [ ] Implement `go.mod` parser (Go)
-- [ ] Implement `Cargo.toml` parser (Rust)
-- [ ] Implement `pyproject.toml` parser (Python)
-- [ ] Add fallback to directory name
-- [ ] Create priority chain for detection
-- [ ] Add manual override via `-p` flag
+### 3.1 Automatic Project Name Detection ✅
+- [x] Implement `package.json` parser (Node.js)
+- [x] Implement `go.mod` parser (Go)
+- [x] Implement `Cargo.toml` parser (Rust)
+- [x] Implement `pyproject.toml` parser (Python)
+- [x] Add fallback to directory name
+- [x] Create priority chain for detection
+- [x] Add manual override via `-p` flag
 
-### 3.2 Environment Management
-- [ ] Implement environment detection logic
-- [ ] Create default environment handling
-- [ ] Add `-e` flag support across commands
-- [ ] Validate environment names
-- [ ] Create environment-specific secret paths
+### 3.2 Environment Management ✅
+- [x] Implement environment detection logic
+- [x] Create default environment handling
+- [x] Add `-e` flag support across commands
+- [x] Validate environment names
+- [x] Create environment-specific secret paths
 
 ---
 

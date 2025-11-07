@@ -15,6 +15,9 @@ const (
 	RSAKeySize = 4096
 )
 
+// Type alias for cleaner code
+type RSAPrivateKey = rsa.PrivateKey
+
 // GenerateRSAKeypair generates a new RSA keypair
 func GenerateRSAKeypair() (*rsa.PrivateKey, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, RSAKeySize)

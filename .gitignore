@@ -1,6 +1,5 @@
 # Build artifacts
 bin/
-nvolt
 *.exe
 *.dll
 *.so
@@ -28,5 +27,4 @@ tmp/
 temp/
 
 # Local nvolt directories (for testing)
-.nvolt/
 test_vault/
