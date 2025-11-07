@@ -173,45 +173,51 @@ This document tracks the implementation progress of nvolt, a GitHub-native, Zero
 - [x] Add Git availability detection
 
 ### 6.2 Global Mode Git Automation ✅
+- [x] Auto-pull BEFORE write operations (push, sync, machine add/rm)
 - [x] Auto-pull before read operations (pull command)
 - [x] Auto-commit after write operations (push, sync, machine add/rm)
 - [x] Generate meaningful commit messages
 - [x] Add conflict detection (SafePull)
 - [x] Handle merge conflicts gracefully (SafePull)
 - [x] Skip Git ops if not in global mode (mode detection)
+- [x] Implement CommitAndPush workflow (Add → Commit → Pull → Push)
+- [x] Use --rebase for clean linear history
+- [x] Proper synchronization: Pull → Work → Commit → Push
 
 ---
 
-## Phase 7: Data Structures & Formats
+## Phase 7: Data Structures & Formats ✅
 
-### 7.1 Encrypted Secret Format (v2)
-- [ ] Implement JSON structure with version field
-- [ ] Add base64-encoded ciphertext
-- [ ] Add nonce/IV field
-- [ ] Add authentication tag
-- [ ] Support backward compatibility
-- [ ] Add schema validation
+### 7.1 Encrypted Secret Format (v2) ✅
+- [x] Implement JSON structure with version field (types.EncryptedSecret)
+- [x] Add base64-encoded ciphertext (Data field)
+- [x] Add nonce/IV field (Nonce field)
+- [x] Add authentication tag (Tag field, GCM includes in ciphertext)
+- [x] Support backward compatibility (version check in DecryptSecret)
+- [x] Add schema validation (JSON marshal/unmarshal)
 
-### 7.2 Wrapped Key Format
-- [ ] Implement machine_id field
-- [ ] Add public_key_fingerprint
-- [ ] Add wrapped_key (base64)
-- [ ] Add granted_by metadata
-- [ ] Add granted_at timestamp
-- [ ] Support key rotation metadata
+### 7.2 Wrapped Key Format ✅
+- [x] Implement machine_id field (types.WrappedKey)
+- [x] Add public_key_fingerprint
+- [x] Add wrapped_key (base64)
+- [x] Add granted_by metadata
+- [x] Add granted_at timestamp
+- [x] Support key rotation metadata (via re-wrapping)
 
-### 7.3 Machine Info Format
-- [ ] Store machine identifier
-- [ ] Store public key in PEM format
-- [ ] Store fingerprint (SHA256)
-- [ ] Add creation timestamp
-- [ ] Add machine description/hostname
+### 7.3 Machine Info Format ✅
+- [x] Store machine identifier (types.MachineInfo)
+- [x] Store public key in PEM format
+- [x] Store fingerprint (SHA256)
+- [x] Add creation timestamp
+- [x] Add machine description/hostname
 
-### 7.4 Keyinfo Metadata
-- [ ] Track project master key version
-- [ ] Store key rotation history
-- [ ] Track authorized machines
-- [ ] Add last modified timestamp
+### 7.4 Keyinfo Metadata (Optional - Deferred)
+- [ ] Track project master key version (types.KeyInfo defined but not used)
+- [ ] Store key rotation history (types.KeyInfo defined but not used)
+- [ ] Track authorized machines (types.KeyInfo defined but not used)
+- [ ] Add last modified timestamp (types.KeyInfo defined but not used)
+
+**Note:** KeyInfo type exists in types.go but is not currently implemented. This is optional for advanced audit logging and can be added in future releases if needed. Core functionality works without it.
 
 ---
 
