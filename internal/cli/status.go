@@ -114,6 +114,7 @@ func displayLocalStatus(vaultPath string) error {
 
 	// Build flat table data
 	var rows [][]string
+
 	for _, envDir := range envDirs {
 		envName := vault.GetDirName(envDir)
 
@@ -133,8 +134,8 @@ func displayLocalStatus(vaultPath string) error {
 		} else {
 			// Add a row for each secret
 			for _, secretFile := range secretFiles {
-				key := vault.GetSecretKeyFromFilename(secretFile)
-				rows = append(rows, []string{projectName, envName, key})
+				secretKey := vault.GetSecretKeyFromFilename(secretFile)
+				rows = append(rows, []string{projectName, envName, secretKey})
 			}
 		}
 	}
@@ -147,6 +148,11 @@ func displayLocalStatus(vaultPath string) error {
 		fmt.Println(renderTable([]string{"Project Name", "Environment", "Env Var"}, rows))
 	}
 	fmt.Println()
+
+	// Display machine access
+	if err := displayMachineAccess(paths, projectName); err != nil {
+		return err
+	}
 
 	return displayMachines(paths)
 }
@@ -223,9 +229,129 @@ func displayGlobalStatus(vaultPath string) error {
 	}
 	fmt.Println()
 
+	// Display machine access for all projects
+	if err := displayGlobalMachineAccess(vaultPath, projects); err != nil {
+		return err
+	}
+
 	// Show machines using the root-level machines directory
 	paths := vault.GetVaultPaths(vaultPath, "")
 	return displayMachines(paths)
+}
+
+func displayMachineAccess(paths *vault.Paths, projectName string) error {
+	// Get all machines
+	machines, err := vault.ListMachines(paths)
+	if err != nil {
+		return err
+	}
+
+	if len(machines) == 0 {
+		return nil
+	}
+
+	// Build machine access table
+	var rows [][]string
+
+	// Get all environments to check for wrapped keys
+	envDirs, err := vault.ListDirs(paths.Secrets)
+	if err != nil {
+		return err
+	}
+
+	for _, machine := range machines {
+		var accessibleEnvs []string
+
+		// Check each environment for this machine's wrapped key
+		for _, envDir := range envDirs {
+			envName := vault.GetDirName(envDir)
+
+			// Filter by environment if specified
+			if statusEnvironment != "" && envName != statusEnvironment {
+				continue
+			}
+
+			wrappedKeyPath := paths.GetWrappedKeyPath(envName, machine.ID)
+			if _, err := os.Stat(wrappedKeyPath); err == nil {
+				accessibleEnvs = append(accessibleEnvs, envName)
+			}
+		}
+
+		if len(accessibleEnvs) > 0 {
+			envList := strings.Join(accessibleEnvs, ", ")
+			rows = append(rows, []string{machine.ID, projectName, envList})
+		}
+	}
+
+	if len(rows) > 0 {
+		fmt.Println(headerStyle.Render("Machine Access"))
+		fmt.Println(renderTable([]string{"Machine ID", "Project", "Environments"}, rows))
+		fmt.Println()
+	}
+
+	return nil
+}
+
+func displayGlobalMachineAccess(vaultPath string, projects []string) error {
+	// Get all machines from root machines directory
+	rootPaths := vault.GetVaultPaths(vaultPath, "")
+	machines, err := vault.ListMachines(rootPaths)
+	if err != nil {
+		return err
+	}
+
+	if len(machines) == 0 {
+		return nil
+	}
+
+	// Build machine access table
+	var rows [][]string
+
+	for _, machine := range machines {
+		for _, project := range projects {
+			// Filter by project if specified
+			if statusProject != "" && project != statusProject {
+				continue
+			}
+
+			paths := vault.GetVaultPaths(vaultPath, project)
+			var accessibleEnvs []string
+
+			// Get all environments for this project
+			envDirs, err := vault.ListDirs(paths.Secrets)
+			if err != nil {
+				continue
+			}
+
+			// Check each environment for this machine's wrapped key
+			for _, envDir := range envDirs {
+				envName := vault.GetDirName(envDir)
+
+				// Filter by environment if specified
+				if statusEnvironment != "" && envName != statusEnvironment {
+					continue
+				}
+
+				wrappedKeyPath := paths.GetWrappedKeyPath(envName, machine.ID)
+				if _, err := os.Stat(wrappedKeyPath); err == nil {
+					accessibleEnvs = append(accessibleEnvs, envName)
+				}
+			}
+
+			if len(accessibleEnvs) > 0 {
+				envList := strings.Join(accessibleEnvs, ", ")
+				rows = append(rows, []string{machine.ID, project, envList})
+			}
+		}
+	}
+
+	if len(rows) > 0 {
+		fmt.Println(headerStyle.Render("Machine Access"))
+		fmt.Println(renderTable([]string{"Machine ID", "Project", "Environments"}, rows))
+		fmt.Println()
+	}
+
+	return nil
 }
 
 func displayMachines(paths *vault.Paths) error {
