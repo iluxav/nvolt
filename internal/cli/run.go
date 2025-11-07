@@ -64,7 +64,7 @@ func runWithSecrets(environment string, cmdArgs []string) error {
 	paths := vault.GetVaultPaths(vaultPath, project)
 
 	// Unwrap master key
-	masterKey, err := vault.UnwrapMasterKey(paths)
+	masterKey, err := vault.UnwrapMasterKey(paths, environment)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w", err)
 	}

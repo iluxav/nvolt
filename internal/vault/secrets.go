@@ -161,9 +161,10 @@ func LoadEncryptedSecret(paths *Paths, environment, key string) (*types.Encrypte
 	return &encrypted, nil
 }
 
-// WrapMasterKeyForMachines wraps the master key for all machines in the vault
+// WrapMasterKeyForMachines wraps the master key for machines with permission prompts
 // Uses unified paths - works identically in both local and global modes
-func WrapMasterKeyForMachines(paths *Paths, masterKey []byte, grantedBy string) error {
+// If autoGrant is true, automatically grants access to all machines without prompting
+func WrapMasterKeyForMachines(paths *Paths, environment string, masterKey []byte, grantedBy string, autoGrant bool) error {
 	// Get all machines
 	machines, err := ListMachines(paths)
 	if err != nil {
@@ -174,8 +175,37 @@ func WrapMasterKeyForMachines(paths *Paths, masterKey []byte, grantedBy string) 
 		return fmt.Errorf("no machines found in vault")
 	}
 
+	// Ensure wrapped keys environment directory exists
+	envDir := paths.GetWrappedKeysEnvPath(environment)
+	if err := ensureDir(envDir, DirPerm); err != nil {
+		return fmt.Errorf("failed to create wrapped keys directory: %w", err)
+	}
+
 	// Wrap key for each machine
 	for _, machine := range machines {
+		wrappedKeyPath := paths.GetWrappedKeyPath(environment, machine.ID)
+
+		// Check if wrapped key already exists
+		keyExists := FileExists(wrappedKeyPath)
+
+		// If key doesn't exist and not auto-granting, prompt for permission
+		// Skip prompt for the current machine (self)
+		if !keyExists && !autoGrant && machine.ID != grantedBy {
+			// Prompt for permission
+			fmt.Printf("\nMachine '%s' (%s) does not have access to '%s' environment.\n",
+				machine.ID, machine.Hostname, environment)
+			fmt.Printf("Grant access? (y/n): ")
+
+			var response string
+			fmt.Scanln(&response)
+
+			if response != "y" && response != "yes" {
+				fmt.Printf("⊘ Skipping machine '%s'\n", machine.ID)
+				continue
+			}
+			fmt.Printf("✓ Granting access to '%s'\n", machine.ID)
+		}
+
 		// Parse public key
 		publicKey, err := crypto.DecodePublicKeyPEM([]byte(machine.PublicKey))
 		if err != nil {
@@ -198,7 +228,6 @@ func WrapMasterKeyForMachines(paths *Paths, masterKey []byte, grantedBy string) 
 		}
 
 		// Save wrapped key
-		wrappedKeyPath := paths.GetWrappedKeyPath(machine.ID)
 		data, err := json.MarshalIndent(wrappedKeyData, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal wrapped key: %w", err)
@@ -212,9 +241,9 @@ func WrapMasterKeyForMachines(paths *Paths, masterKey []byte, grantedBy string) 
 	return nil
 }
 
-// UnwrapMasterKey unwraps the master key for the current machine
+// UnwrapMasterKey unwraps the master key for the current machine in a specific environment
 // Uses unified paths - works identically in both local and global modes
-func UnwrapMasterKey(paths *Paths) ([]byte, error) {
+func UnwrapMasterKey(paths *Paths, environment string) ([]byte, error) {
 
 	// Get current machine ID
 	machineID, err := GetCurrentMachineID()
@@ -223,10 +252,10 @@ func UnwrapMasterKey(paths *Paths) ([]byte, error) {
 	}
 
 	// Load wrapped key
-	wrappedKeyPath := paths.GetWrappedKeyPath(machineID)
+	wrappedKeyPath := paths.GetWrappedKeyPath(environment, machineID)
 	data, err := ReadFile(wrappedKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read wrapped key: %w (machine may not have access)", err)
+		return nil, fmt.Errorf("access denied to '%s' environment: %w\nYou may need to request access from someone with push permissions", environment, err)
 	}
 
 	var wrappedKeyData types.WrappedKey

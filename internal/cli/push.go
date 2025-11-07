@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
@@ -31,12 +30,13 @@ Examples:
 		environment, _ := cmd.Flags().GetString("env")
 		project, _ := cmd.Flags().GetString("project")
 		keyValues, _ := cmd.Flags().GetStringSlice("key")
+		autoGrant, _ := cmd.Flags().GetBool("auto-grant")
 
-		return runPush(envFile, environment, project, keyValues)
+		return runPush(envFile, environment, project, keyValues, autoGrant)
 	},
 }
 
-func runPush(envFile, environment, project string, keyValues []string) error {
+func runPush(envFile, environment, project string, keyValues []string, autoGrant bool) error {
 	fmt.Println("Pushing secrets to vault...")
 
 	// Find vault path
@@ -109,7 +109,7 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	}
 
 	// Check if master key exists or generate new one
-	masterKey, isNew, err := getOrCreateMasterKey(paths)
+	masterKey, isNew, err := getOrCreateMasterKey(paths, environment)
 	if err != nil {
 		return err
 	}
@@ -126,13 +126,17 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 		return fmt.Errorf("failed to load machine info: %w", err)
 	}
 
-	// ALWAYS wrap master key for all machines (not just when new)
-	// This ensures newly added machines get access to the master key
-	fmt.Println("Wrapping master key for all machines...")
-	if err := wrapMasterKeyForMachines(paths, masterKey, machineInfo.ID); err != nil {
+	// ALWAYS wrap master key for all machines (with permission control per environment)
+	// This ensures newly added machines can request access to specific environments
+	if autoGrant {
+		fmt.Println("Wrapping master key for all machines (auto-granting access)...")
+	} else {
+		fmt.Println("Wrapping master key for machines (will prompt for new machines)...")
+	}
+	if err := wrapMasterKeyForMachines(paths, environment, masterKey, machineInfo.ID, autoGrant); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
 	}
-	fmt.Println("✓ Master key wrapped for all machines")
+	fmt.Println("✓ Master key wrapping complete")
 
 	// Encrypt and save each secret
 	fmt.Printf("Encrypting %d secrets for environment '%s'...\n", len(secrets), environment)
@@ -174,10 +178,10 @@ func runPush(envFile, environment, project string, keyValues []string) error {
 	return nil
 }
 
-// getOrCreateMasterKey gets the existing master key or creates a new one
-func getOrCreateMasterKey(paths *vault.Paths) ([]byte, bool, error) {
+// getOrCreateMasterKey gets the existing master key or creates a new one for the specified environment
+func getOrCreateMasterKey(paths *vault.Paths, environment string) ([]byte, bool, error) {
 	// Try to unwrap existing master key
-	masterKey, err := unwrapMasterKey(paths)
+	masterKey, err := unwrapMasterKey(paths, environment)
 	if err == nil {
 		return masterKey, false, nil
 	}
@@ -191,8 +195,8 @@ func getOrCreateMasterKey(paths *vault.Paths) ([]byte, bool, error) {
 	return masterKey, true, nil
 }
 
-// unwrapMasterKey attempts to load and unwrap the master key for the current machine
-func unwrapMasterKey(paths *vault.Paths) ([]byte, error) {
+// unwrapMasterKey attempts to load and unwrap the master key for the current machine in a specific environment
+func unwrapMasterKey(paths *vault.Paths, environment string) ([]byte, error) {
 	// Get current machine ID
 	machineID, err := vault.GetCurrentMachineID()
 	if err != nil {
@@ -200,10 +204,10 @@ func unwrapMasterKey(paths *vault.Paths) ([]byte, error) {
 	}
 
 	// Load wrapped key
-	wrappedKeyPath := paths.GetWrappedKeyPath(machineID)
+	wrappedKeyPath := paths.GetWrappedKeyPath(environment, machineID)
 	data, err := vault.ReadFile(wrappedKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read wrapped key: %w (machine may not have access)", err)
+		return nil, fmt.Errorf("failed to read wrapped key: %w (machine may not have access to '%s' environment)", err, environment)
 	}
 
 	var wrappedKeyData types.WrappedKey
@@ -232,45 +236,9 @@ func unwrapMasterKey(paths *vault.Paths) ([]byte, error) {
 }
 
 // wrapMasterKeyForMachines wraps the master key for all machines in the vault
-func wrapMasterKeyForMachines(paths *vault.Paths, masterKey []byte, grantedBy string) error {
-	// List all machines
-	machines, err := vault.ListMachines(paths)
-	if err != nil {
-		return fmt.Errorf("failed to list machines: %w", err)
-	}
-
-	// Wrap key for each machine
-	for _, machine := range machines {
-		publicKey, err := crypto.DecodePublicKeyPEM([]byte(machine.PublicKey))
-		if err != nil {
-			return fmt.Errorf("failed to decode public key for %s: %w", machine.ID, err)
-		}
-
-		wrappedKey, err := crypto.WrapKey(publicKey, masterKey)
-		if err != nil {
-			return fmt.Errorf("failed to wrap key for %s: %w", machine.ID, err)
-		}
-
-		wrappedKeyData := &types.WrappedKey{
-			MachineID:            machine.ID,
-			PublicKeyFingerprint: machine.Fingerprint,
-			WrappedKey:           base64.StdEncoding.EncodeToString(wrappedKey),
-			GrantedBy:            grantedBy,
-			GrantedAt:            time.Now(),
-		}
-
-		data, err := json.MarshalIndent(wrappedKeyData, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal wrapped key for %s: %w", machine.ID, err)
-		}
-
-		wrappedKeyPath := paths.GetWrappedKeyPath(machine.ID)
-		if err := vault.WriteFileAtomic(wrappedKeyPath, data, vault.FilePerm); err != nil {
-			return fmt.Errorf("failed to save wrapped key for %s: %w", machine.ID, err)
-		}
-	}
-
-	return nil
+// This is a wrapper around vault.WrapMasterKeyForMachines
+func wrapMasterKeyForMachines(paths *vault.Paths, environment string, masterKey []byte, grantedBy string, autoGrant bool) error {
+	return vault.WrapMasterKeyForMachines(paths, environment, masterKey, grantedBy, autoGrant)
 }
 
 func init() {
@@ -278,5 +246,6 @@ func init() {
 	pushCmd.Flags().StringP("env", "e", "default", "Environment name")
 	pushCmd.Flags().StringP("project", "p", "", "Project name (auto-detected if not specified)")
 	pushCmd.Flags().StringSliceP("key", "k", []string{}, "Key=value pairs (can be specified multiple times)")
+	pushCmd.Flags().Bool("auto-grant", false, "Automatically grant access to all machines without prompting")
 	rootCmd.AddCommand(pushCmd)
 }

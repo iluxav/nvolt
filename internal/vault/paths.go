@@ -169,9 +169,14 @@ func (p *Paths) GetSecretFilePath(environment, key string) string {
 	return filepath.Join(p.Secrets, environment, fmt.Sprintf("%s.enc.json", key))
 }
 
-// GetWrappedKeyPath returns the path for a machine's wrapped key
-func (p *Paths) GetWrappedKeyPath(machineID string) string {
-	return filepath.Join(p.WrappedKeys, fmt.Sprintf("%s.json", machineID))
+// GetWrappedKeyPath returns the path for a machine's wrapped key in a specific environment
+func (p *Paths) GetWrappedKeyPath(environment, machineID string) string {
+	return filepath.Join(p.WrappedKeys, environment, fmt.Sprintf("%s.json", machineID))
+}
+
+// GetWrappedKeysEnvPath returns the wrapped keys directory for a specific environment
+func (p *Paths) GetWrappedKeysEnvPath(environment string) string {
+	return filepath.Join(p.WrappedKeys, environment)
 }
 
 // GetMachineInfoPath returns the path for a machine's info file

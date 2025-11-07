@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
 	"github.com/iluxav/nvolt/internal/vault"
@@ -12,20 +14,24 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Re-wrap or rotate master keys",
-	Long: `Synchronize and re-wrap keys for all machines.
+	Long: `Synchronize and re-wrap keys for all machines in a specific environment.
 
 Use --rotate to generate a new master key and re-encrypt all secrets.
 
 Examples:
-  nvolt sync           # Re-wrap existing keys
-  nvolt sync --rotate  # Rotate master key`,
+  nvolt sync                    # Re-wrap existing keys for default environment
+  nvolt sync -e production      # Re-wrap keys for production environment
+  nvolt sync --rotate           # Rotate master key for default environment
+  nvolt sync -e prod --rotate   # Rotate master key for production environment`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		rotate, _ := cmd.Flags().GetBool("rotate")
-		return runSync(rotate)
+		environment, _ := cmd.Flags().GetString("env")
+		autoGrant, _ := cmd.Flags().GetBool("auto-grant")
+		return runSync(rotate, environment, autoGrant)
 	},
 }
 
-func runSync(rotate bool) error {
+func runSync(rotate bool, environment string, autoGrant bool) error {
 	// Find vault path
 	vaultPath, err := findVaultPath()
 	if err != nil {
@@ -49,17 +55,29 @@ func runSync(rotate bool) error {
 		return fmt.Errorf("failed to load machine info: %w", err)
 	}
 
-	// TODO: In global mode with multiple projects, this should sync all projects
-	// For now, we use empty project name which works for local mode
-	paths := vault.GetVaultPaths(vaultPath, "")
+	// Detect project name in global mode
+	var project string
+	if vault.IsGlobalMode(vaultPath) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		detectedProject, _, err := config.GetProjectName(cwd, "")
+		if err != nil {
+			return fmt.Errorf("failed to detect project name: %w", err)
+		}
+		project = detectedProject
+	}
+
+	paths := vault.GetVaultPaths(vaultPath, project)
 
 	var masterKey []byte
 
 	if rotate {
-		fmt.Println("Rotating master key...")
+		fmt.Printf("Rotating master key for environment '%s'...\n", environment)
 
 		// Load existing master key first to re-encrypt secrets
-		oldMasterKey, err := vault.UnwrapMasterKey(paths)
+		oldMasterKey, err := vault.UnwrapMasterKey(paths, environment)
 		if err != nil {
 			return fmt.Errorf("failed to unwrap old master key: %w", err)
 		}
@@ -70,17 +88,17 @@ func runSync(rotate bool) error {
 			return fmt.Errorf("failed to generate new master key: %w", err)
 		}
 
-		// Re-encrypt all secrets with new key
-		if err := rotateSecretsEncryption(vaultPath, oldMasterKey, masterKey); err != nil {
+		// Re-encrypt secrets in this environment with new key
+		if err := rotateSecretsEncryption(paths, environment, oldMasterKey, masterKey); err != nil {
 			return fmt.Errorf("failed to re-encrypt secrets: %w", err)
 		}
 
 		fmt.Println("✓ Generated new master key and re-encrypted all secrets")
 	} else {
-		fmt.Println("Re-wrapping master key for all machines...")
+		fmt.Printf("Re-wrapping master key for environment '%s' for all machines...\n", environment)
 
 		// Load existing master key
-		masterKey, err = vault.UnwrapMasterKey(paths)
+		masterKey, err = vault.UnwrapMasterKey(paths, environment)
 		if err != nil {
 			return fmt.Errorf("failed to unwrap master key: %w", err)
 		}
@@ -89,7 +107,12 @@ func runSync(rotate bool) error {
 	}
 
 	// Wrap master key for all machines
-	if err := vault.WrapMasterKeyForMachines(paths, masterKey, machineInfo.ID); err != nil {
+	if autoGrant {
+		fmt.Println("Auto-granting access to all machines...")
+	} else {
+		fmt.Println("Wrapping master key for machines (will prompt for new machines)...")
+	}
+	if err := vault.WrapMasterKeyForMachines(paths, environment, masterKey, machineInfo.ID, autoGrant); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
 	}
 
@@ -134,75 +157,57 @@ func runSync(rotate bool) error {
 	return nil
 }
 
-// rotateSecretsEncryption re-encrypts all secrets with a new master key
-func rotateSecretsEncryption(vaultPath string, oldKey, newKey []byte) error {
-	// TODO: In global mode with multiple projects, this should rotate all projects
-	// For now, we use empty project name which works for local mode
-	paths := vault.GetVaultPaths(vaultPath, "")
-
-	// Get all environment directories
-	envDirs, err := vault.ListDirs(paths.Secrets)
+// rotateSecretsEncryption re-encrypts all secrets in a specific environment with a new master key
+func rotateSecretsEncryption(paths *vault.Paths, environment string, oldKey, newKey []byte) error {
+	// List all secrets in this environment
+	secretFiles, err := vault.ListFiles(paths.GetSecretsPath(environment))
 	if err != nil {
-		return fmt.Errorf("failed to list environments: %w", err)
+		return fmt.Errorf("failed to list secrets: %w", err)
 	}
 
-	totalSecrets := 0
+	if len(secretFiles) == 0 {
+		fmt.Printf("No secrets found in environment '%s' to re-encrypt\n", environment)
+		return nil
+	}
 
-	// Re-encrypt secrets in each environment
-	for _, envDir := range envDirs {
-		// Get environment name from directory
-		environment := vault.GetDirName(envDir)
+	fmt.Printf("Re-encrypting %d secret(s) in environment '%s'...\n", len(secretFiles), environment)
 
-		// List all secrets in this environment
-		secretFiles, err := vault.ListFiles(paths.GetSecretsPath(environment))
+	for _, secretFile := range secretFiles {
+		// Extract key name from filename
+		key := vault.GetSecretKeyFromFilename(secretFile)
+
+		// Load encrypted secret
+		encrypted, err := vault.LoadEncryptedSecret(paths, environment, key)
 		if err != nil {
-			// Skip if directory doesn't exist or is empty
-			continue
+			return fmt.Errorf("failed to load secret %s: %w", key, err)
 		}
 
-		fmt.Printf("Re-encrypting %d secret(s) in environment '%s'...\n", len(secretFiles), environment)
+		// Decrypt with old key
+		plaintext, err := vault.DecryptSecret(oldKey, encrypted)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt secret %s with old key: %w", key, err)
+		}
 
-		for _, secretFile := range secretFiles {
-			// Extract key name from filename
-			key := vault.GetSecretKeyFromFilename(secretFile)
+		// Re-encrypt with new key
+		newEncrypted, err := vault.EncryptSecret(newKey, plaintext)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt secret %s with new key: %w", key, err)
+		}
 
-			// Load encrypted secret
-			encrypted, err := vault.LoadEncryptedSecret(paths, environment, key)
-			if err != nil {
-				return fmt.Errorf("failed to load secret %s: %w", key, err)
-			}
-
-			// Decrypt with old key
-			plaintext, err := vault.DecryptSecret(oldKey, encrypted)
-			if err != nil {
-				return fmt.Errorf("failed to decrypt secret %s with old key: %w", key, err)
-			}
-
-			// Re-encrypt with new key
-			newEncrypted, err := vault.EncryptSecret(newKey, plaintext)
-			if err != nil {
-				return fmt.Errorf("failed to encrypt secret %s with new key: %w", key, err)
-			}
-
-			// Save re-encrypted secret
-			if err := vault.SaveEncryptedSecret(paths, environment, key, newEncrypted); err != nil {
-				return fmt.Errorf("failed to save re-encrypted secret %s: %w", key, err)
-			}
-
-			totalSecrets++
+		// Save re-encrypted secret
+		if err := vault.SaveEncryptedSecret(paths, environment, key, newEncrypted); err != nil {
+			return fmt.Errorf("failed to save re-encrypted secret %s: %w", key, err)
 		}
 	}
 
-	if totalSecrets == 0 {
-		fmt.Println("No secrets found to re-encrypt")
-	} else {
-		fmt.Printf("✓ Re-encrypted %d secret(s)\n", totalSecrets)
-	}
+	fmt.Printf("✓ Re-encrypted %d secret(s)\n", len(secretFiles))
 
 	return nil
 }
 
 func init() {
 	syncCmd.Flags().Bool("rotate", false, "Rotate the master key")
+	syncCmd.Flags().StringP("env", "e", "default", "Environment name")
+	syncCmd.Flags().Bool("auto-grant", false, "Automatically grant access to all machines without prompting")
 	rootCmd.AddCommand(syncCmd)
 }

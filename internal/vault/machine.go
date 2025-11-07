@@ -201,12 +201,18 @@ func RemoveMachineFromVault(paths *Paths, machineID string) error {
 		return fmt.Errorf("failed to remove machine info: %w", err)
 	}
 
-	// Remove wrapped key
-	wrappedKeyPath := paths.GetWrappedKeyPath(machineID)
-	if err := DeleteFile(wrappedKeyPath); err != nil {
-		// Wrapped key might not exist, that's okay
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove wrapped key: %w", err)
+	// Remove wrapped keys from all environments
+	envDirs, err := ListDirs(paths.Secrets)
+	if err == nil {
+		for _, envDir := range envDirs {
+			envName := GetDirName(envDir)
+			wrappedKeyPath := paths.GetWrappedKeyPath(envName, machineID)
+			if err := DeleteFile(wrappedKeyPath); err != nil {
+				// Wrapped key might not exist, that's okay
+				if !os.IsNotExist(err) {
+					return fmt.Errorf("failed to remove wrapped key for environment '%s': %w", envName, err)
+				}
+			}
 		}
 	}
 

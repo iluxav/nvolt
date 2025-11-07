@@ -68,7 +68,7 @@ func runPull(environment, project string, write bool) error {
 	paths := vault.GetVaultPaths(vaultPath, project)
 
 	// Unwrap master key
-	masterKey, err := vault.UnwrapMasterKey(paths)
+	masterKey, err := vault.UnwrapMasterKey(paths, environment)
 	if err != nil {
 		return fmt.Errorf("failed to unwrap master key: %w\nMake sure you have pushed secrets first", err)
 	}

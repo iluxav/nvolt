@@ -73,6 +73,18 @@ func runVaultShow() error {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
 
+	// List environments first to show access per environment
+	envDirs, err := vault.ListDirs(paths.Secrets)
+	if err != nil {
+		fmt.Printf("Warning: Could not list environments: %v\n\n", err)
+		envDirs = []string{}
+	}
+
+	environments := []string{}
+	for _, envDir := range envDirs {
+		environments = append(environments, vault.GetDirName(envDir))
+	}
+
 	fmt.Printf("Registered Machines (%d):\n", len(machines))
 	if len(machines) == 0 {
 		fmt.Printf("  (none)\n")
@@ -86,13 +98,20 @@ func runVaultShow() error {
 				fmt.Printf("    Description: %s\n", m.Description)
 			}
 
-			// Check if wrapped key exists
-			wrappedKeyPath := paths.GetWrappedKeyPath(m.ID)
-			hasKey := vault.FileExists(wrappedKeyPath)
-			if hasKey {
-				fmt.Printf("    Access:      ✓ Has wrapped key\n")
+			// Check access for each environment
+			if len(environments) > 0 {
+				fmt.Printf("    Access:\n")
+				for _, env := range environments {
+					wrappedKeyPath := paths.GetWrappedKeyPath(env, m.ID)
+					hasKey := vault.FileExists(wrappedKeyPath)
+					if hasKey {
+						fmt.Printf("      %s: ✓\n", env)
+					} else {
+						fmt.Printf("      %s: ✗\n", env)
+					}
+				}
 			} else {
-				fmt.Printf("    Access:      ✗ No wrapped key\n")
+				fmt.Printf("    Access:      (no environments)\n")
 			}
 		}
 	}
@@ -100,7 +119,7 @@ func runVaultShow() error {
 	fmt.Printf("\n")
 
 	// List environments
-	envDirs, err := vault.ListDirs(paths.Secrets)
+	envDirs, err = vault.ListDirs(paths.Secrets)
 	if err != nil {
 		fmt.Printf("Environments: (error listing: %v)\n\n", err)
 	} else if len(envDirs) == 0 {
@@ -155,12 +174,19 @@ func runVaultVerify() error {
 	} else {
 		fmt.Printf("✓ Current machine: %s\n", currentMachine.ID)
 
-		// Check if current machine can decrypt
-		_, err := vault.UnwrapMasterKey(paths)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("Current machine cannot unwrap master key: %v", err))
-		} else {
-			fmt.Printf("✓ Current machine can unwrap master key\n")
+		// List environments to check access
+		envDirs, err := vault.ListDirs(paths.Secrets)
+		if err == nil && len(envDirs) > 0 {
+			fmt.Printf("Checking access to environments...\n")
+			for _, envDir := range envDirs {
+				envName := vault.GetDirName(envDir)
+				_, err := vault.UnwrapMasterKey(paths, envName)
+				if err != nil {
+					warnings = append(warnings, fmt.Sprintf("Current machine cannot unwrap master key for '%s': %v", envName, err))
+				} else {
+					fmt.Printf("  ✓ Can access '%s'\n", envName)
+				}
+			}
 		}
 	}
 
@@ -172,22 +198,42 @@ func runVaultVerify() error {
 	} else {
 		fmt.Printf("✓ Found %d machine(s)\n", len(machines))
 
-		// Check each machine has a wrapped key
-		for _, m := range machines {
-			wrappedKeyPath := paths.GetWrappedKeyPath(m.ID)
-			if !vault.FileExists(wrappedKeyPath) {
-				warnings = append(warnings, fmt.Sprintf("Machine %s has no wrapped key", m.ID))
+		// Get list of environments
+		envDirs, err := vault.ListDirs(paths.Secrets)
+		environments := []string{}
+		if err == nil {
+			for _, envDir := range envDirs {
+				environments = append(environments, vault.GetDirName(envDir))
+			}
+		}
+
+		// Check each machine has wrapped keys for environments
+		if len(environments) > 0 {
+			for _, m := range machines {
+				hasAnyKey := false
+				for _, env := range environments {
+					wrappedKeyPath := paths.GetWrappedKeyPath(env, m.ID)
+					if vault.FileExists(wrappedKeyPath) {
+						hasAnyKey = true
+						break
+					}
+				}
+				if !hasAnyKey {
+					warnings = append(warnings, fmt.Sprintf("Machine %s has no wrapped keys in any environment", m.ID))
+				}
 			}
 		}
 	}
 
 	// Check wrapped keys for orphans
 	fmt.Printf("\nChecking wrapped keys...\n")
-	wrappedKeyFiles, err := vault.ListFiles(paths.WrappedKeys)
+
+	// Get list of environments
+	envDirs, err := vault.ListDirs(paths.Secrets)
 	if err != nil {
-		errors = append(errors, fmt.Sprintf("Cannot list wrapped keys: %v", err))
+		errors = append(errors, fmt.Sprintf("Cannot list environments: %v", err))
 	} else {
-		fmt.Printf("✓ Found %d wrapped key(s)\n", len(wrappedKeyFiles))
+		totalWrappedKeys := 0
 
 		// Check for orphaned wrapped keys
 		machineIDs := make(map[string]bool)
@@ -195,23 +241,39 @@ func runVaultVerify() error {
 			machineIDs[m.ID] = true
 		}
 
-		for _, keyFile := range wrappedKeyFiles {
-			// Extract machine ID from filename (remove .json)
-			filename := vault.GetDirName(keyFile)
-			machineID := filename
-			if len(filename) > 5 && filename[len(filename)-5:] == ".json" {
-				machineID = filename[:len(filename)-5]
+		// Iterate through each environment's wrapped keys
+		for _, envDir := range envDirs {
+			envName := vault.GetDirName(envDir)
+			wrappedKeysEnvPath := paths.GetWrappedKeysEnvPath(envName)
+
+			wrappedKeyFiles, err := vault.ListFiles(wrappedKeysEnvPath)
+			if err != nil {
+				// Skip if directory doesn't exist
+				continue
 			}
 
-			if !machineIDs[machineID] {
-				warnings = append(warnings, fmt.Sprintf("Orphaned wrapped key found: %s", keyFile))
+			totalWrappedKeys += len(wrappedKeyFiles)
+
+			for _, keyFile := range wrappedKeyFiles {
+				// Extract machine ID from filename (remove .json)
+				filename := vault.GetDirName(keyFile)
+				machineID := filename
+				if len(filename) > 5 && filename[len(filename)-5:] == ".json" {
+					machineID = filename[:len(filename)-5]
+				}
+
+				if !machineIDs[machineID] {
+					warnings = append(warnings, fmt.Sprintf("Orphaned wrapped key found: %s/%s", envName, filename))
+				}
 			}
 		}
+
+		fmt.Printf("✓ Found %d wrapped key(s) across all environments\n", totalWrappedKeys)
 	}
 
 	// Check secrets
 	fmt.Printf("\nChecking secrets...\n")
-	envDirs, err := vault.ListDirs(paths.Secrets)
+	envDirs, err = vault.ListDirs(paths.Secrets)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Cannot list environments: %v", err))
 	} else {
