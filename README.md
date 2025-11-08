@@ -1,8 +1,21 @@
 # nvolt
 
+<div align="center">
+
+```
+   ███╗   ██╗██╗   ██╗ ██████╗ ██╗  ████████╗
+   ████╗  ██║██║   ██║██╔═══██╗██║  ╚══██╔══╝
+██╔██╗ ██║██║   ██║██║   ██║██║     ██║
+██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ██║
+██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗██║
+╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝╚═╝
+```
+
 **GitHub-native, Zero-Trust CLI for managing encrypted environment variables**
 
-nvolt is a cryptographically enforced secret manager built entirely around Git and local files. No server, no login, no organization model - just Git, encryption, and per-machine keypairs.
+</div>
+
+**`nvolt`** is a cryptographically enforced secret manager built entirely around Git and local files. No server, no login, no organization model - just Git, encryption, and per-machine keypairs.
 
 ## Features
 
