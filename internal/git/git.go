@@ -220,3 +220,58 @@ func CommitAndPush(repoPath, message string, paths ...string) error {
 
 	return nil
 }
+
+// FileHistory represents the git history of a file
+type FileHistory struct {
+	LastModified string // Last commit date
+	ModifiedBy   string // Last commit author
+}
+
+// GetFileHistory returns the last commit date and author for a file
+// Returns empty strings if the file has no git history
+func GetFileHistory(repoPath, filePath string) (FileHistory, error) {
+	// Check if git is available and this is a git repo
+	if !IsGitAvailable() || !IsGitRepo(repoPath) {
+		return FileHistory{}, nil
+	}
+
+	// Get last commit info for this file
+	// Format: "2025-11-08 14:23:45|John Doe"
+	cmd := exec.Command("git", "-C", repoPath, "log", "-1", "--format=%ai|%an", "--", filePath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// File probably not committed yet
+		return FileHistory{}, nil
+	}
+
+	result := strings.TrimSpace(string(output))
+	if result == "" {
+		// No commits for this file
+		return FileHistory{}, nil
+	}
+
+	// Parse the output
+	parts := strings.Split(result, "|")
+	if len(parts) != 2 {
+		return FileHistory{}, nil
+	}
+
+	// Parse the date (format: "2025-11-08 14:23:45 -0500")
+	// We'll just take the date and time part
+	dateTime := strings.TrimSpace(parts[0])
+	author := strings.TrimSpace(parts[1])
+
+	// Simplify the date format (remove timezone)
+	if idx := strings.LastIndex(dateTime, " "); idx > 0 {
+		// Check if the last part looks like a timezone
+		lastPart := dateTime[idx+1:]
+		if strings.HasPrefix(lastPart, "+") || strings.HasPrefix(lastPart, "-") {
+			dateTime = dateTime[:idx]
+		}
+	}
+
+	return FileHistory{
+		LastModified: dateTime,
+		ModifiedBy:   author,
+	}, nil
+}

@@ -3,12 +3,14 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/iluxav/nvolt/internal/config"
+	"github.com/iluxav/nvolt/internal/git"
 	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
@@ -108,6 +110,9 @@ func displayLocalStatus(vaultPath string) error {
 		projectName = "local"
 	}
 
+	// Determine the git repo path (for local mode, it's the current directory)
+	repoPath := cwd
+
 	// List environments
 	envDirs, err := vault.ListDirs(paths.Secrets)
 	if err != nil || len(envDirs) == 0 {
@@ -135,12 +140,26 @@ func displayLocalStatus(vaultPath string) error {
 
 		if len(secretFiles) == 0 {
 			// Show environment even if no secrets
-			rows = append(rows, []string{projectName, envName, valueStyle.Render("(no secrets)")})
+			rows = append(rows, []string{projectName, envName, valueStyle.Render("(no secrets)"), "-", "-"})
 		} else {
 			// Add a row for each secret
 			for _, secretFile := range secretFiles {
 				secretKey := vault.GetSecretKeyFromFilename(secretFile)
-				rows = append(rows, []string{projectName, envName, secretKey})
+
+				// Get git history for this file
+				relPath, _ := filepath.Rel(repoPath, secretFile)
+				history, _ := git.GetFileHistory(repoPath, relPath)
+
+				lastModified := "-"
+				modifiedBy := "-"
+				if history.LastModified != "" {
+					lastModified = history.LastModified
+				}
+				if history.ModifiedBy != "" {
+					modifiedBy = history.ModifiedBy
+				}
+
+				rows = append(rows, []string{projectName, envName, secretKey, lastModified, modifiedBy})
 			}
 		}
 	}
@@ -150,7 +169,7 @@ func displayLocalStatus(vaultPath string) error {
 	if len(rows) == 0 {
 		fmt.Println(valueStyle.Render("No secrets found matching the filter criteria"))
 	} else {
-		fmt.Println(renderTable([]string{"Project Name", "Environment", "Env Var"}, rows))
+		fmt.Println(renderTable([]string{"Project Name", "Environment", "Env Var", "Last Modified", "Modified By"}, rows))
 	}
 	fmt.Println()
 
@@ -183,6 +202,9 @@ func displayGlobalStatus(vaultPath string) error {
 
 	sort.Strings(projects)
 
+	// For global mode, the repo path is the vault path itself
+	repoPath := vaultPath
+
 	// Build flat table data for all projects
 	var rows [][]string
 	for _, project := range projects {
@@ -214,12 +236,26 @@ func displayGlobalStatus(vaultPath string) error {
 
 			if len(secretFiles) == 0 {
 				// Show environment even if no secrets
-				rows = append(rows, []string{project, envName, valueStyle.Render("(no secrets)")})
+				rows = append(rows, []string{project, envName, valueStyle.Render("(no secrets)"), "-", "-"})
 			} else {
 				// Add a row for each secret
 				for _, secretFile := range secretFiles {
 					key := vault.GetSecretKeyFromFilename(secretFile)
-					rows = append(rows, []string{project, envName, key})
+
+					// Get git history for this file
+					relPath, _ := filepath.Rel(repoPath, secretFile)
+					history, _ := git.GetFileHistory(repoPath, relPath)
+
+					lastModified := "-"
+					modifiedBy := "-"
+					if history.LastModified != "" {
+						lastModified = history.LastModified
+					}
+					if history.ModifiedBy != "" {
+						modifiedBy = history.ModifiedBy
+					}
+
+					rows = append(rows, []string{project, envName, key, lastModified, modifiedBy})
 				}
 			}
 		}
@@ -230,7 +266,7 @@ func displayGlobalStatus(vaultPath string) error {
 	if len(rows) == 0 {
 		fmt.Println(valueStyle.Render("No secrets found matching the filter criteria"))
 	} else {
-		fmt.Println(renderTable([]string{"Project Name", "Environment", "Env Var"}, rows))
+		fmt.Println(renderTable([]string{"Project Name", "Environment", "Env Var", "Last Modified", "Modified By"}, rows))
 	}
 	fmt.Println()
 
