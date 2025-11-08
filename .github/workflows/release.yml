@@ -1,0 +1,158 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.24.3"
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+            output: nvolt-linux-amd64
+          - goos: linux
+            goarch: arm64
+            output: nvolt-linux-arm64
+          # macOS
+          - goos: darwin
+            goarch: amd64
+            output: nvolt-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            output: nvolt-darwin-arm64
+          # Windows
+          - goos: windows
+            goarch: amd64
+            output: nvolt-windows-amd64.exe
+          - goos: windows
+            goarch: arm64
+            output: nvolt-windows-arm64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          # Extract version from git tag (remove 'v' prefix if present)
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ ! "$VERSION" =~ ^v[0-9] ]]; then
+            VERSION="dev"
+          fi
+
+          # Build with version injected
+          go build -trimpath -ldflags="-s -w -X github.com/iluxav/nvolt/internal/cli.version=${VERSION}" -o ${{ matrix.output }} cmd/nvolt/main.go
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: ${{ matrix.output }}
+          retention-days: 1
+
+  upload-to-r2:
+    name: Upload binaries to R2
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./binaries
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone for R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${R2_ACCESS_KEY_ID}
+          secret_access_key = ${R2_SECRET_ACCESS_KEY}
+          endpoint = ${R2_ENDPOINT}
+          acl = private
+          EOF
+
+      - name: Upload binaries to R2
+        env:
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          # Get version from tag or use 'latest'
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ ! "$VERSION" =~ ^v[0-9] ]]; then
+            VERSION="latest"
+          fi
+
+          # Move all binaries to a flat structure
+          mkdir -p upload
+          find ./binaries -type f -exec mv {} ./upload/ \;
+
+          # Copy install script
+          cp install.sh upload/install.sh
+          chmod +x upload/install.sh
+
+          # Upload each binary to R2
+          for binary in ./upload/*; do
+            filename=$(basename "$binary")
+            echo "Uploading $filename to R2..."
+
+            # Upload with version
+            rclone copy "$binary" "r2:${R2_BUCKET_NAME}/${VERSION}/" --s3-no-check-bucket --progress
+
+            # Also upload to 'latest' if this is a tagged release
+            if [[ "$VERSION" =~ ^v[0-9] ]]; then
+              rclone copy "$binary" "r2:${R2_BUCKET_NAME}/latest/" --s3-no-check-bucket --progress
+            fi
+          done
+
+          echo "All binaries uploaded successfully!"
+
+      - name: Generate checksums
+        run: |
+          cd upload
+          sha256sum * > SHA256SUMS
+
+      - name: Upload checksums to R2
+        env:
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ ! "$VERSION" =~ ^v[0-9] ]]; then
+            VERSION="latest"
+          fi
+
+          rclone copy upload/SHA256SUMS "r2:${R2_BUCKET_NAME}/${VERSION}/" --s3-no-check-bucket --progress
+
+          if [[ "$VERSION" =~ ^v[0-9] ]]; then
+            rclone copy upload/SHA256SUMS "r2:${R2_BUCKET_NAME}/latest/" --s3-no-check-bucket --progress
+          fi
