@@ -42,6 +42,11 @@ Examples:
 }
 
 func runWithSecrets(environment string, cmdArgs []string) error {
+	// Ensure machine is initialized
+	if err := EnsureMachineInitialized(); err != nil {
+		return err
+	}
+
 	// Find vault path
 	vaultPath, err := findVaultPath()
 	if err != nil {

@@ -33,6 +33,11 @@ Examples:
 }
 
 func runPull(environment, project string, write bool) error {
+	// Ensure machine is initialized
+	if err := EnsureMachineInitialized(); err != nil {
+		return err
+	}
+
 	fmt.Println("Pulling secrets from vault...")
 
 	// Find vault path

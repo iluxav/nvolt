@@ -102,7 +102,8 @@ func runMachineAdd(machineName string) error {
 	}
 
 	// Create machine info
-	machineID := vault.GenerateMachineID(machineName, fingerprint)
+	// Use custom name from user input, fallback to machineName as hostname
+	machineID := vault.GenerateMachineID(machineName, machineName, fingerprint)
 	machineInfo := &types.MachineInfo{
 		ID:          machineID,
 		PublicKey:   string(publicKeyPEM),

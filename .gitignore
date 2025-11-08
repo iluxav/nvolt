@@ -18,6 +18,8 @@ coverage.out
 *.swo
 *~
 .claude
+.nvolt
+
 # OS
 .DS_Store
 Thumbs.db

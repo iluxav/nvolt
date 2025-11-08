@@ -38,30 +38,19 @@ func runInit(repoSpec string) error {
 	ui.PrintBanner("Initializing nvolt vault...")
 	fmt.Println()
 
-	// Step 1: Ensure machine keypair exists
-	machineInitialized, err := vault.IsMachineInitialized()
-	if err != nil {
-		return fmt.Errorf("failed to check machine initialization: %w", err)
+	// Step 1: Ensure machine keypair exists (with custom name prompt)
+	if err := EnsureMachineInitialized(); err != nil {
+		return fmt.Errorf("failed to initialize machine: %w", err)
 	}
 
-	if !machineInitialized {
-		fmt.Println("Generating machine keypair...")
-		machineInfo, err := vault.InitializeMachine()
-		if err != nil {
-			return fmt.Errorf("failed to initialize machine: %w", err)
-		}
-		fmt.Printf("✓ Machine keypair generated\n")
-		fmt.Printf("  Machine ID: %s\n", machineInfo.ID)
-		fmt.Printf("  Fingerprint: %s\n", machineInfo.Fingerprint)
-	} else {
-		machineInfo, err := vault.LoadMachineInfo()
-		if err != nil {
-			return fmt.Errorf("failed to load machine info: %w", err)
-		}
-		fmt.Printf("✓ Using existing machine keypair\n")
-		fmt.Printf("  Machine ID: %s\n", machineInfo.ID)
-		fmt.Printf("  Fingerprint: %s\n", machineInfo.Fingerprint)
+	// Load machine info to display
+	machineInfo, err := vault.LoadMachineInfo()
+	if err != nil {
+		return fmt.Errorf("failed to load machine info: %w", err)
 	}
+	fmt.Printf("✓ Using machine keypair\n")
+	fmt.Printf("  Machine ID: %s\n", machineInfo.ID)
+	fmt.Printf("  Fingerprint: %s\n", machineInfo.Fingerprint)
 
 	// Step 2: Determine mode and initialize vault
 	if repoSpec != "" {

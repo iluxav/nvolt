@@ -38,6 +38,11 @@ Examples:
 }
 
 func runPush(envFile, environment, project string, keyValues []string, autoGrant, dryRun bool) error {
+	// Ensure machine is initialized
+	if err := EnsureMachineInitialized(); err != nil {
+		return err
+	}
+
 	if dryRun {
 		fmt.Println("[DRY RUN] Simulating push operation...")
 	} else {

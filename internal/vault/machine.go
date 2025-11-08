@@ -11,7 +11,8 @@ import (
 )
 
 // InitializeMachine creates a new machine keypair and stores it in ~/.nvolt
-func InitializeMachine() (*types.MachineInfo, error) {
+// customName is an optional custom name for the machine (empty string for auto-generated)
+func InitializeMachine(customName string) (*types.MachineInfo, error) {
 	homePaths, err := GetHomePaths()
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func InitializeMachine() (*types.MachineInfo, error) {
 
 	// Create machine info
 	machineInfo := &types.MachineInfo{
-		ID:          GenerateMachineID(hostname, fingerprint),
+		ID:          GenerateMachineID(customName, hostname, fingerprint),
 		PublicKey:   string(publicKeyPEM),
 		Fingerprint: fingerprint,
 		Hostname:    hostname,
@@ -143,34 +144,45 @@ func LoadPrivateKey() (*crypto.RSAPrivateKey, error) {
 	return privateKey, nil
 }
 
-// GenerateMachineID generates a machine ID from hostname and fingerprint
-func GenerateMachineID(hostname, fingerprint string) string {
-	if hostname == "" || hostname == "unknown" {
-		return fmt.Sprintf("m-%d", time.Now().Unix())
-	}
-
-	// Use first 8 characters of fingerprint (after SHA256:) to make ID unique
-	// This allows multiple machines with same hostname to have different IDs
-	fingerprintSuffix := ""
+// GenerateMachineID generates a machine ID from custom name, hostname, and fingerprint
+// If customName is provided, it uses: customName-{6char-unique-id}
+// Otherwise falls back to: m-hostname-{6char-unique-id}
+func GenerateMachineID(customName, hostname, fingerprint string) string {
+	// Generate unique suffix from fingerprint (6-7 characters)
+	uniqueSuffix := ""
 	if len(fingerprint) > 7 {
-		// Remove "SHA256:" prefix and get first 8 chars of the hash
+		// Remove "SHA256:" prefix and get first 7 chars of the hash
 		fpHash := fingerprint[7:] // Skip "SHA256:"
-		if len(fpHash) >= 8 {
+		if len(fpHash) >= 7 {
 			// Replace any characters that are invalid in filenames
-			// Specifically replace / with _ to avoid creating subdirectories
 			safeFpHash := ""
-			for _, ch := range fpHash[:8] {
+			for _, ch := range fpHash[:7] {
 				if ch == '/' || ch == '\\' || ch == ':' {
 					safeFpHash += "_"
 				} else {
 					safeFpHash += string(ch)
 				}
 			}
-			fingerprintSuffix = "-" + safeFpHash
+			uniqueSuffix = safeFpHash
 		}
 	}
 
-	return fmt.Sprintf("m-%s%s", hostname, fingerprintSuffix)
+	// If no unique suffix, use timestamp
+	if uniqueSuffix == "" {
+		uniqueSuffix = fmt.Sprintf("%d", time.Now().Unix()%1000000)
+	}
+
+	// If custom name provided, use it
+	if customName != "" {
+		return fmt.Sprintf("%s-%s", customName, uniqueSuffix)
+	}
+
+	// Otherwise use hostname-based default
+	if hostname == "" || hostname == "unknown" {
+		return fmt.Sprintf("m-%s", uniqueSuffix)
+	}
+
+	return fmt.Sprintf("m-%s-%s", hostname, uniqueSuffix)
 }
 
 // AddMachineToVault adds a new machine's public key to the vault
