@@ -117,6 +117,10 @@
                     </div>
                 </div>
             </div>
+            <div class="quick-install-card">
+                <code>curl -sSL https://nvolt.io/install.sh | sh</code>
+                <button class="btn btn-small btn-secondary" onclick="copyCode(this)">Copy</button>
+            </div>
             <div class="hero-terminal">
                 <div class="terminal">
                     <div class="terminal-header">
@@ -126,13 +130,16 @@
                         <div class="terminal-title">terminal</div>
                     </div>
                     <div class="terminal-body">
-                        <span>
-    ███╗   ██╗██╗   ██╗ ██████╗ ██╗  ████████╗
-    ████╗  ██║██║   ██║██╔═══██╗██║  ╚══██╔══╝
-    ██╔██╗ ██║██║   ██║██║   ██║██║     ██║
-    ██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ██║
-    ██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗██║
-    ╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝╚═╝</span>
+                        <code style="text-align: center;">
+                        <pre class="terminal-banner">
+   ███╗   ██╗██╗   ██╗ ██████╗ ██╗  ████████╗
+   ████╗  ██║██║   ██║██╔═══██╗██║  ╚══██╔══╝
+██╔██╗ ██║██║   ██║██║   ██║██║     ██║
+██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ██║
+██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗██║
+╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝╚═╝
+</pre>
+</code>
                         <div class="terminal-line"><span class="prompt">$</span> nvolt init</div>
                         <div class="terminal-line output"> Machine keypair generated</div>
                         <div class="terminal-line output"> Vault initialized at .nvolt/</div>
@@ -141,7 +148,7 @@
                         <div class="terminal-line output"> Secrets pushed to vault</div>
                         <div class="terminal-line"><span class="prompt">$</span> nvolt run npm start</div>
                         <div class="terminal-line output"> Loaded 12 secrets</div>
-                        <div class="terminal-line output🚀 Server running on port 3000</div>
+                        <div class="terminal-line output"🚀 Server running on port 3000</div>
                     </div>
                 </div>
             </div>
@@ -460,19 +467,11 @@
             <div class="install-section">
                 <h3>Install nvolt</h3>
                 <div class="install-tabs">
-                    <button class="tab-btn active" data-tab="macos">macOS</button>
-                    <button class="tab-btn" data-tab="linux">Linux</button>
+                    <button class="tab-btn active" data-tab="script">Quick Install (macOS/Linux/Windows)</button>
                     <button class="tab-btn" data-tab="source">From Source</button>
                 </div>
 
-                <div class="tab-content active" data-tab="macos">
-                    <div class="code-block large">
-                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                        <code>brew install nvolt</code>
-                    </div>
-                </div>
-
-                <div class="tab-content" data-tab="linux">
+                <div class="tab-content active" data-tab="script">
                     <div class="code-block large">
                         <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                         <code>curl -sSL https://nvolt.io/install.sh | sh</code>
@@ -484,7 +483,8 @@
                         <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                         <code>git clone https://github.com/iluxav/nvolt.git
 cd nvolt
-go build -o nvolt ./cmd/nvolt</code>
+go build -o nvolt ./cmd/nvolt
+sudo mv nvolt /usr/local/bin/</code>
                     </div>
                 </div>
             </div>
@@ -508,6 +508,10 @@ go build -o nvolt ./cmd/nvolt</code>
                             <h4>Push your secrets</h4>
                             <div class="code-block">
                                 <code>nvolt push -f .env</code>
+                            </div>
+                            <span style="margin:6px 0; display:flex; opacity: 40%;">or</span>
+                            <div class="code-block">
+                                <code>nvolt push -k ENV1=secret1  -k ENV2=secret2</code>
                             </div>
                         </div>
                     </div>

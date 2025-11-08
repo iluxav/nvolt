@@ -135,6 +135,11 @@ body {
     font-size: 1.1rem;
 }
 
+.btn-small {
+    padding: 6px 10px;
+    font-size: 0.7rem;
+}
+
 /* Hero Section */
 .hero {
     padding: var(--spacing-xl) 0;
@@ -298,6 +303,17 @@ body {
     font-size: 0.95rem;
 }
 
+.terminal-banner {
+    color: var(--primary-yellow);
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 0.65rem;
+    line-height: 1.2;
+    margin: 0 0 1rem 0;
+    padding: 0;
+    white-space: pre;
+    overflow: hidden;
+}
+
 .terminal-line {
     margin-bottom: 0.5rem;
 }
@@ -350,6 +366,20 @@ section {
     border-radius: 12px;
     border: 1px solid var(--border-color);
     transition: all 0.3s;
+}
+
+.quick-install-card {
+    max-width: 600px;
+    margin: 40px auto 0 auto;
+    padding: 12px;
+    background-color: var(--dark-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .problem-card:hover {
@@ -718,6 +748,23 @@ section {
 }
 
 .copy-btn:hover {
+    background-color: var(--yellow-light);
+}
+
+
+.copy-btn2 {
+    padding: 0.5rem 1rem;
+    background-color: var(--primary-yellow);
+    color: var(--primary-black);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.3s;
+}
+
+.copy-btn2:hover {
     background-color: var(--yellow-light);
 }
 

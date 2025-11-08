@@ -148,8 +148,8 @@ nvolt init --repo my-org/nvolt-secrets</code>
                     <code># From a .env file
 nvolt push -f .env.production -e production
 
-# Or set secrets directly
-nvolt push DATABASE_URL=postgres://localhost:5432/mydb</code>
+# Or set secrets directly with -k flag
+nvolt push -k DATABASE_URL=postgres://localhost:5432/mydb -k API_KEY=secret123</code>
                 </div>
 
                 <h3>3. Pull Secrets</h3>
@@ -245,16 +245,17 @@ nvolt init --repo org/repo-name</code>
                     <code># From .env file
 nvolt push -f .env.production -e production
 
-# Set individual secrets
-nvolt push API_KEY=abc123 DB_PASSWORD=secret
+# Set individual secrets with -k flag
+nvolt push -k API_KEY=abc123 -k DB_PASSWORD=secret
 
-# Specify project name
-nvolt push -f .env -p my-backend -e staging</code>
+# Multiple secrets and specify project name
+nvolt push -k API_KEY=abc123 -k DB_SECRET=xyz789 -p my-backend -e staging</code>
                 </div>
 
                 <h3>Flags</h3>
                 <ul>
                     <li><code>-f, --file</code> - Path to .env file</li>
+                    <li><code>-k, --key</code> - Key=value pairs (can be specified multiple times)</li>
                     <li><code>-e, --env</code> - Environment name (default: "default")</li>
                     <li><code>-p, --project</code> - Project name (auto-detected if not specified)</li>
                 </ul>
