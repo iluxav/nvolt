@@ -35,15 +35,15 @@
 
 ## Why nvolt?
 
-| Feature | nvolt | HashiCorp Vault | Doppler | git-crypt | SOPS |
-|---------|-------|-----------------|---------|-----------|------|
-| **Monthly Cost** | **$0** | $$$ | $$ | $0 | $0 |
-| **Zero-Knowledge** | ✅ | ⚠️ Self-hosted only | ❌ | ✅ | ✅ |
-| **No Backend** | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **No Login/Auth** | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **Per-Machine Access** | ✅ | ✅ | ✅ | ⚠️ GPG only | ⚠️ GPG only |
-| **Environment-Based** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Multi-Project** | ✅ | ✅ | ✅ | ⚠️ Limited | ⚠️ Limited |
+| Feature                | nvolt    | HashiCorp Vault     | Doppler | git-crypt   | SOPS        |
+| ---------------------- | -------- | ------------------- | ------- | ----------- | ----------- |
+| **Monthly Cost**       | **free** | $$$                 | $$      | free        | free        |
+| **Zero-Knowledge**     | ✅       | ⚠️ Self-hosted only | ❌      | ✅          | ✅          |
+| **No Backend**         | ✅       | ❌                  | ❌      | ✅          | ✅          |
+| **No Login/Auth**      | ✅       | ❌                  | ❌      | ✅          | ✅          |
+| **Per-Machine Access** | ✅       | ✅                  | ✅      | ⚠️ GPG only | ⚠️ GPG only |
+| **Environment-Based**  | ✅       | ✅                  | ✅      | ❌          | ❌          |
+| **Multi-Project**      | ✅       | ✅                  | ✅      | ⚠️ Limited  | ⚠️ Limited  |
 
 ## Installation
 
@@ -129,6 +129,7 @@ nvolt init --repo org/secrets-repo
 ```
 
 **Flags:**
+
 - `--repo` - GitHub repository URL for global vault
 
 ---
@@ -149,6 +150,7 @@ nvolt push -k API_KEY=abc123 -k DB_SECRET=xyz789 -p my-backend -e staging
 ```
 
 **Flags:**
+
 - `-f, --file` - Path to .env file
 - `-k, --key` - Key=value pairs (can be specified multiple times)
 - `-e, --env` - Environment name (default: "default")
@@ -172,6 +174,7 @@ nvolt pull -e production > .env.local
 ```
 
 **Flags:**
+
 - `-e, --env` - Environment name (default: "default")
 - `-p, --project` - Project name (auto-detected if not specified)
 
@@ -193,6 +196,7 @@ nvolt run python app.py
 ```
 
 **Flags:**
+
 - `-e, --env` - Environment name (default: "default")
 - `-c, --command` - Command to run
 
@@ -252,6 +256,7 @@ nvolt sync --rotate
 ```
 
 **Flags:**
+
 - `--rotate` - Rotate the master encryption key
 
 ## Security
