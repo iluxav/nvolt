@@ -23,7 +23,7 @@ func TestGenerateMachineID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.hostname, func(t *testing.T) {
-			id := GenerateMachineID(tt.hostname, tt.fingerprint)
+			id := GenerateMachineID(tt.hostname, tt.hostname, tt.fingerprint)
 			if len(id) < 2 {
 				t.Errorf("Machine ID too short: %s", id)
 			}
@@ -250,7 +250,7 @@ func TestInitializeMachineWithRealHome(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 
 	// Now initialize machine
-	machineInfo, err := InitializeMachine()
+	machineInfo, err := InitializeMachine("test-machine")
 	if err != nil {
 		t.Fatalf("Failed to initialize machine: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestInitializeMachineWithRealHome(t *testing.T) {
 	}
 
 	// Try to initialize again (should fail)
-	_, err = InitializeMachine()
+	_, err = InitializeMachine("test-machine")
 	if err == nil {
 		t.Error("Expected error when initializing machine twice")
 	}
