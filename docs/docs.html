@@ -108,7 +108,7 @@
                 <h3>Linux</h3>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                    <code>curl -sSL https://nvolt.io/install.sh | sh</code>
+                    <code>curl -fsSL https://install.nvolt.io/latest/install.sh | bash</code>
                 </div>
 
                 <h3>From Source</h3>
@@ -661,7 +661,7 @@ jobs:
 
       - name: Install nvolt
         run: |
-          curl -sSL https://nvolt.io/install.sh | sh
+          curl -fsSL https://install.nvolt.io/latest/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Setup nvolt private key
@@ -713,7 +713,7 @@ nvolt sync</code>
 test:
   stage: test
   before_script:
-    - curl -sSL https://nvolt.io/install.sh | sh
+    - curl -fsSL https://install.nvolt.io/latest/install.sh | bash
     - export PATH="$HOME/.local/bin:$PATH"
     - mkdir -p ~/.nvolt
     - cp $NVOLT_PRIVATE_KEY ~/.nvolt/private_key.pem

@@ -51,7 +51,7 @@
 
 ```bash
 # macOS and Linux (also works in Git Bash on Windows)
-curl -sSL https://nvolt.io/install.sh | sh
+curl -fsSL https://install.nvolt.io/latest/install.sh | bash
 ```
 
 ### Using Go
