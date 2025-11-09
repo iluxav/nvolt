@@ -9,6 +9,7 @@ import (
 	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +39,7 @@ func runPull(environment, project string, write bool) error {
 		return err
 	}
 
-	fmt.Println("Pulling secrets from vault...")
+	ui.Step("Pulling secrets from vault")
 
 	// Find vault path
 	vaultPath, err := findVaultPath()
@@ -49,11 +50,11 @@ func runPull(environment, project string, write bool) error {
 	// Auto-pull in global mode
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("Global mode: pulling latest changes from repository...")
+		ui.Step("Pulling latest changes from repository")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull from repository: %w", err)
 		}
-		fmt.Println("✓ Repository up to date")
+		ui.Success("Repository up to date")
 
 		// Detect or use provided project name
 		if project == "" {
@@ -66,7 +67,7 @@ func runPull(environment, project string, write bool) error {
 				return fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
 			}
 			project = detectedProject
-			fmt.Printf("Detected project: %s\n", project)
+			ui.PrintDetected("Project", project)
 		}
 	}
 
@@ -127,7 +128,7 @@ func runPull(environment, project string, write bool) error {
 		return fmt.Errorf("no secrets could be decrypted")
 	}
 
-	fmt.Printf("✓ Decrypted %d secrets from environment '%s'\n\n", len(secrets), environment)
+	ui.Success(fmt.Sprintf("Decrypted %d secrets from environment '%s'", len(secrets), ui.Cyan(environment)))
 
 	// Format output
 	output := vault.FormatEnvOutput(secrets)
@@ -144,10 +145,10 @@ func runPull(environment, project string, write bool) error {
 			return fmt.Errorf("failed to write .env file: %w", err)
 		}
 
-		fmt.Printf("✓ Written to %s\n", envFile)
+		ui.Success(fmt.Sprintf("Written to %s", ui.Cyan(envFile)))
 	} else {
 		// Print to stdout
-		fmt.Println("Secrets:")
+		ui.Section("Secrets:")
 
 		// Sort keys for consistent output
 		keys := make([]string, 0, len(secrets))

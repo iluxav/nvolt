@@ -2,11 +2,15 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/iluxav/nvolt/pkg/types"
 	"github.com/spf13/cobra"
@@ -57,8 +61,26 @@ var machineListCmd = &cobra.Command{
 	},
 }
 
+var machineGrantCmd = &cobra.Command{
+	Use:   "grant [machine-id]",
+	Short: "Grant a machine access to an environment",
+	Long: `Grant a specific machine access to decrypt secrets in an environment.
+
+Examples:
+  nvolt machine grant ci-server
+  nvolt machine grant ci-server -e production
+  nvolt machine grant alice-laptop -p myproject -e staging`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		machineID := args[0]
+		environment, _ := cmd.Flags().GetString("env")
+		project, _ := cmd.Flags().GetString("project")
+		return runMachineGrant(machineID, environment, project)
+	},
+}
+
 func runMachineAdd(machineName string) error {
-	fmt.Printf("Adding machine: %s\n", machineName)
+	ui.Step(fmt.Sprintf("Adding machine: %s", ui.Cyan(machineName)))
 
 	// Find vault path (local or global)
 	vaultPath, err := findVaultPath()
@@ -69,15 +91,15 @@ func runMachineAdd(machineName string) error {
 	// Pull latest changes in global mode BEFORE doing any work
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("Global mode: pulling latest changes...")
+		ui.Step("Pulling latest changes from repository")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
-		fmt.Println("✓ Pulled latest changes from repository")
+		ui.Success("Repository up to date")
 	}
 
 	// Generate keypair for new machine
-	fmt.Println("Generating keypair...")
+	ui.Step("Generating keypair")
 	privateKey, err := crypto.GenerateRSAKeypair()
 	if err != nil {
 		return fmt.Errorf("failed to generate keypair: %w", err)
@@ -119,34 +141,34 @@ func runMachineAdd(machineName string) error {
 		return fmt.Errorf("failed to add machine to vault: %w", err)
 	}
 
-	fmt.Printf("\n✓ Machine added successfully\n")
-	fmt.Printf("  Machine ID: %s\n", machineID)
-	fmt.Printf("  Fingerprint: %s\n", fingerprint)
-	fmt.Printf("\nPrivate key (save this securely for the new machine):\n")
-	fmt.Printf("---\n%s---\n", string(privateKeyPEM))
-	fmt.Printf("\nTo use this machine:\n")
-	fmt.Printf("1. Save the private key to ~/.nvolt/private_key.pem on the target machine\n")
-	fmt.Printf("2. Set permissions: chmod 600 ~/.nvolt/private_key.pem\n")
-	fmt.Printf("3. Save the machine info to ~/.nvolt/machines/machine-info.json\n")
+	ui.Success("Machine added successfully")
+	ui.PrintKeyValue("  Machine ID", machineID)
+	ui.PrintKeyValue("  Fingerprint", fingerprint)
+	ui.Section("Private key (save this securely for the new machine):")
+	fmt.Printf("%s%s%s\n", ui.Gray("---\n"), string(privateKeyPEM), ui.Gray("---"))
+	ui.Section("To use this machine:")
+	ui.Info("  1. Save the private key to ~/.nvolt/private_key.pem on the target machine")
+	ui.Info("  2. Set permissions: chmod 600 ~/.nvolt/private_key.pem")
+	ui.Info("  3. Save the machine info to ~/.nvolt/machines/machine-info.json")
 
 	// Auto-commit and push in global mode
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("\nGlobal mode: committing and pushing changes...")
+		ui.Step("Committing and pushing changes to repository")
 
 		commitMsg := fmt.Sprintf("Add machine: %s", machineName)
 		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
 			return fmt.Errorf("failed to commit and push changes: %w", err)
 		}
 
-		fmt.Println("✓ Changes committed and pushed to repository")
+		ui.Success("Changes committed and pushed")
 	}
 
 	return nil
 }
 
 func runMachineRm(machineName string) error {
-	fmt.Printf("Removing machine: %s\n", machineName)
+	ui.Step(fmt.Sprintf("Removing machine: %s", ui.Cyan(machineName)))
 
 	// Find vault path
 	vaultPath, err := findVaultPath()
@@ -157,11 +179,11 @@ func runMachineRm(machineName string) error {
 	// Pull latest changes in global mode BEFORE doing any work
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("Global mode: pulling latest changes...")
+		ui.Step("Pulling latest changes from repository")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
-		fmt.Println("✓ Pulled latest changes from repository")
+		ui.Success("Repository up to date")
 	}
 
 	// List all machines and find matching ones (machines are at root level)
@@ -188,9 +210,9 @@ func runMachineRm(machineName string) error {
 		machineID = matchingMachines[0].ID
 	} else {
 		// Multiple matches - let user choose
-		fmt.Println("\nMultiple machines found:")
+		ui.Section("Multiple machines found:")
 		for i, m := range matchingMachines {
-			fmt.Printf("%d. %s (Fingerprint: %s)\n", i+1, m.ID, m.Fingerprint)
+			ui.Info(fmt.Sprintf("%d. %s (Fingerprint: %s)", i+1, ui.Cyan(m.ID), ui.Gray(m.Fingerprint)))
 		}
 		fmt.Print("\nEnter number to remove: ")
 		var choice int
@@ -202,11 +224,11 @@ func runMachineRm(machineName string) error {
 	}
 
 	// Confirm removal
-	fmt.Printf("Are you sure you want to remove machine %s? This cannot be undone. (yes/no): ", machineID)
+	fmt.Printf("\n%s %s? This cannot be undone. (yes/no): ", ui.Yellow("Are you sure you want to remove machine"), ui.Cyan(machineID))
 	var response string
 	fmt.Scanln(&response)
 	if response != "yes" {
-		fmt.Println("Aborted.")
+		ui.Warning("Aborted")
 		return nil
 	}
 
@@ -215,21 +237,22 @@ func runMachineRm(machineName string) error {
 		return fmt.Errorf("failed to remove machine: %w", err)
 	}
 
-	fmt.Printf("✓ Machine %s removed successfully\n", machineID)
-	fmt.Println("\nNote: You should re-wrap the master key using 'nvolt sync' to ensure")
-	fmt.Println("the removed machine cannot decrypt new secrets.")
+	ui.Success(fmt.Sprintf("Machine %s removed successfully", machineID))
+	fmt.Println()
+	ui.Warning("Note: You should re-wrap the master key using 'nvolt sync' to ensure")
+	ui.Warning("      the removed machine cannot decrypt new secrets.")
 
 	// Auto-commit and push in global mode
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("\nGlobal mode: committing and pushing changes...")
+		ui.Step("Committing and pushing changes to repository")
 
 		commitMsg := fmt.Sprintf("Remove machine: %s", machineID)
 		if err := git.CommitAndPush(repoPath, commitMsg, ".nvolt"); err != nil {
 			return fmt.Errorf("failed to commit and push changes: %w", err)
 		}
 
-		fmt.Println("✓ Changes committed and pushed to repository")
+		ui.Success("Changes committed and pushed")
 	}
 
 	return nil
@@ -250,20 +273,142 @@ func runMachineList() error {
 	}
 
 	if len(machines) == 0 {
-		fmt.Println("No machines found in vault.")
+		ui.Warning("No machines found in vault")
 		return nil
 	}
 
-	fmt.Printf("Machines (%d):\n\n", len(machines))
+	ui.Section(fmt.Sprintf("Machines (%d):", len(machines)))
 	for _, m := range machines {
-		fmt.Printf("  ID:          %s\n", m.ID)
-		fmt.Printf("  Hostname:    %s\n", m.Hostname)
-		fmt.Printf("  Fingerprint: %s\n", m.Fingerprint)
-		fmt.Printf("  Created:     %s\n", m.CreatedAt.Format(time.RFC3339))
+		ui.PrintKeyValue("  ID", ui.Cyan(m.ID))
+		ui.PrintKeyValue("  Hostname", m.Hostname)
+		ui.PrintKeyValue("  Fingerprint", ui.Gray(m.Fingerprint))
+		ui.PrintKeyValue("  Created", ui.Gray(m.CreatedAt.Format(time.RFC3339)))
 		if m.Description != "" {
-			fmt.Printf("  Description: %s\n", m.Description)
+			ui.PrintKeyValue("  Description", m.Description)
 		}
 		fmt.Println()
+	}
+
+	return nil
+}
+
+func runMachineGrant(machineID, environment, project string) error {
+	ui.Step(fmt.Sprintf("Granting access to machine: %s", ui.Cyan(machineID)))
+
+	// Ensure machine is initialized
+	if err := EnsureMachineInitialized(); err != nil {
+		return err
+	}
+
+	// Find vault path
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return err
+	}
+
+	// Pull latest changes in global mode BEFORE doing any work
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		ui.Step("Pulling latest changes from repository")
+		if err := git.SafePull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull latest changes: %w", err)
+		}
+		ui.Success("Repository up to date")
+
+		// Detect or use provided project name
+		if project == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
+			}
+			detectedProject, _, err := config.GetProjectName(cwd, "")
+			if err != nil {
+				return fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
+			}
+			project = detectedProject
+		}
+	}
+
+	// Get vault paths
+	paths := vault.GetVaultPaths(vaultPath, project)
+
+	// Get current machine info for grantedBy
+	currentMachine, err := vault.LoadMachineInfo()
+	if err != nil {
+		return fmt.Errorf("failed to load current machine info: %w", err)
+	}
+
+	// Display grant details
+	fmt.Println()
+	if project != "" {
+		ui.PrintKeyValue("  Project", ui.Cyan(project))
+	}
+	ui.PrintKeyValue("  Environment", ui.Cyan(environment))
+	ui.PrintKeyValue("  Machine", ui.Cyan(machineID))
+
+	// Confirm with user
+	fmt.Printf("\n%s ", ui.Yellow("Are you sure you want to grant access?"))
+	fmt.Print("(y/n): ")
+	var response string
+	fmt.Scanln(&response)
+
+	if response != "y" && response != "yes" {
+		ui.Warning("Aborted")
+		return nil
+	}
+
+	// Load master key for the environment
+	ui.Step("Loading master key")
+	masterKey, err := vault.UnwrapMasterKey(paths, environment)
+	if err != nil {
+		// Check if it's an access denied error
+		if strings.Contains(err.Error(), "access denied") || strings.Contains(err.Error(), "no such file or directory") {
+			ui.Error(fmt.Sprintf("You don't have access to the '%s' environment", ui.Cyan(environment)))
+			fmt.Println()
+			ui.Info("To grant access to another machine, you must first have access to the environment yourself.")
+			ui.Info(fmt.Sprintf("Ask someone with access to run: %s", ui.Gray(fmt.Sprintf("nvolt machine grant %s -e %s", currentMachine.ID, environment))))
+			return nil
+		}
+		return fmt.Errorf("failed to unwrap master key: %w", err)
+	}
+	defer crypto.ZeroBytes(masterKey)
+	ui.Success("Master key loaded")
+
+	// Grant access to the machine
+	ui.Step(fmt.Sprintf("Granting access to %s", ui.Cyan(machineID)))
+	wasGranted, err := vault.GrantMachineAccess(paths, environment, machineID, masterKey, currentMachine.ID)
+	if err != nil {
+		return fmt.Errorf("failed to grant access: %w", err)
+	}
+
+	if wasGranted {
+		ui.Success(fmt.Sprintf("Access granted to %s", ui.Cyan(machineID)))
+		fmt.Println()
+		ui.Info(fmt.Sprintf("Machine %s can now decrypt secrets in environment %s",
+			ui.Cyan(machineID), ui.Cyan(environment)))
+	} else {
+		ui.Success(fmt.Sprintf("Machine %s already has access to environment %s",
+			ui.Cyan(machineID), ui.Cyan(environment)))
+		fmt.Println()
+		ui.Info("No changes needed")
+	}
+
+	// Auto-commit and push in global mode
+	if vault.IsGlobalMode(vaultPath) {
+		repoPath := vault.GetRepoPathFromVault(vaultPath)
+		ui.Step("Committing and pushing changes to repository")
+
+		commitMsg := fmt.Sprintf("Grant %s access to %s environment", machineID, environment)
+		if project != "" {
+			commitMsg = fmt.Sprintf("Grant %s access to %s/%s", machineID, project, environment)
+		}
+
+		// Commit and push
+		if err := git.CommitAndPush(repoPath, commitMsg, project, "machines"); err != nil {
+			return fmt.Errorf("failed to commit and push changes: %w", err)
+		}
+
+		ui.Success("Changes committed and pushed")
 	}
 
 	return nil
@@ -331,5 +476,11 @@ func init() {
 	machineCmd.AddCommand(machineAddCmd)
 	machineCmd.AddCommand(machineRmCmd)
 	machineCmd.AddCommand(machineListCmd)
+	machineCmd.AddCommand(machineGrantCmd)
+
+	// Add flags to grant command
+	machineGrantCmd.Flags().StringP("env", "e", "default", "Environment name")
+	machineGrantCmd.Flags().StringP("project", "p", "", "Project name (auto-detected if not specified)")
+
 	rootCmd.AddCommand(machineCmd)
 }

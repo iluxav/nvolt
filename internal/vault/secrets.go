@@ -241,6 +241,138 @@ func WrapMasterKeyForMachines(paths *Paths, environment string, masterKey []byte
 	return nil
 }
 
+// WrapMasterKeyForExistingMachines wraps the master key ONLY for machines that already have access
+// This is used during push to update existing keys without granting new access
+func WrapMasterKeyForExistingMachines(paths *Paths, environment string, masterKey []byte, grantedBy string) error {
+	// Get all machines
+	machines, err := ListMachines(paths)
+	if err != nil {
+		return fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	if len(machines) == 0 {
+		return fmt.Errorf("no machines found in vault")
+	}
+
+	// Ensure wrapped keys environment directory exists
+	envDir := paths.GetWrappedKeysEnvPath(environment)
+	if err := ensureDir(envDir, DirPerm); err != nil {
+		return fmt.Errorf("failed to create wrapped keys directory: %w", err)
+	}
+
+	// Wrap key ONLY for machines that already have access
+	for _, machine := range machines {
+		wrappedKeyPath := paths.GetWrappedKeyPath(environment, machine.ID)
+
+		// Only wrap if key already exists or if it's the current machine
+		if !FileExists(wrappedKeyPath) && machine.ID != grantedBy {
+			continue // Skip machines without existing access
+		}
+
+		// Parse public key
+		publicKey, err := crypto.DecodePublicKeyPEM([]byte(machine.PublicKey))
+		if err != nil {
+			return fmt.Errorf("failed to decode public key for %s: %w", machine.ID, err)
+		}
+
+		// Wrap master key
+		wrappedKey, err := crypto.WrapKey(publicKey, masterKey)
+		if err != nil {
+			return fmt.Errorf("failed to wrap key for %s: %w", machine.ID, err)
+		}
+
+		// Create wrapped key metadata
+		wrappedKeyData := &types.WrappedKey{
+			MachineID:            machine.ID,
+			PublicKeyFingerprint: machine.Fingerprint,
+			WrappedKey:           base64.StdEncoding.EncodeToString(wrappedKey),
+			GrantedBy:            grantedBy,
+			GrantedAt:            machine.CreatedAt,
+		}
+
+		// Save wrapped key
+		data, err := json.MarshalIndent(wrappedKeyData, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal wrapped key: %w", err)
+		}
+
+		if err := WriteFileAtomic(wrappedKeyPath, data, FilePerm); err != nil {
+			return fmt.Errorf("failed to save wrapped key for %s: %w", machine.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// GrantMachineAccess grants a specific machine access to an environment
+// Returns (wasGranted, error) where wasGranted indicates if access was newly granted
+// Returns (false, nil) if machine already has access (not an error)
+func GrantMachineAccess(paths *Paths, environment, machineID string, masterKey []byte, grantedBy string) (bool, error) {
+	// Get all machines
+	machines, err := ListMachines(paths)
+	if err != nil {
+		return false, fmt.Errorf("failed to list machines: %w", err)
+	}
+
+	// Find the machine
+	var targetMachine *types.MachineInfo
+	for _, m := range machines {
+		if m.ID == machineID {
+			targetMachine = m
+			break
+		}
+	}
+
+	if targetMachine == nil {
+		return false, fmt.Errorf("machine '%s' not found in vault", machineID)
+	}
+
+	// Check if machine already has access
+	wrappedKeyPath := paths.GetWrappedKeyPath(environment, machineID)
+	if FileExists(wrappedKeyPath) {
+		return false, nil // Already has access - not an error
+	}
+
+	// Ensure wrapped keys environment directory exists
+	envDir := paths.GetWrappedKeysEnvPath(environment)
+	if err := ensureDir(envDir, DirPerm); err != nil {
+		return false, fmt.Errorf("failed to create wrapped keys directory: %w", err)
+	}
+
+	// Parse public key
+	publicKey, err := crypto.DecodePublicKeyPEM([]byte(targetMachine.PublicKey))
+	if err != nil {
+		return false, fmt.Errorf("failed to decode public key for %s: %w", machineID, err)
+	}
+
+	// Wrap master key
+	wrappedKey, err := crypto.WrapKey(publicKey, masterKey)
+	if err != nil {
+		return false, fmt.Errorf("failed to wrap key for %s: %w", machineID, err)
+	}
+
+	// Create wrapped key metadata
+	wrappedKeyData := &types.WrappedKey{
+		MachineID:            targetMachine.ID,
+		PublicKeyFingerprint: targetMachine.Fingerprint,
+		WrappedKey:           base64.StdEncoding.EncodeToString(wrappedKey),
+		GrantedBy:            grantedBy,
+		GrantedAt:            targetMachine.CreatedAt,
+	}
+
+	// Save wrapped key
+	data, err := json.MarshalIndent(wrappedKeyData, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal wrapped key: %w", err)
+	}
+
+	if err := WriteFileAtomic(wrappedKeyPath, data, FilePerm); err != nil {
+		return false, fmt.Errorf("failed to save wrapped key for %s: %w", machineID, err)
+	}
+
+	return true, nil
+}
+
 // UnwrapMasterKey unwraps the master key for the current machine in a specific environment
 // Uses unified paths - works identically in both local and global modes
 func UnwrapMasterKey(paths *Paths, environment string) ([]byte, error) {

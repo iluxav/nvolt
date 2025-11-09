@@ -54,6 +54,7 @@
                     <h4>Usage</h4>
                     <ul>
                         <li><a href="#init">nvolt init</a></li>
+                        <li><a href="#join">nvolt join</a></li>
                         <li><a href="#push">nvolt push</a></li>
                         <li><a href="#pull">nvolt pull</a></li>
                         <li><a href="#run">nvolt run</a></li>
@@ -235,6 +236,42 @@ nvolt init --repo org/repo-name</code>
                 </ul>
             </section>
 
+            <section id="join">
+                <h2>nvolt join</h2>
+                <p>Join an existing vault and register this machine.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Local mode - vault in current directory
+nvolt join
+
+# Global mode - vault in GitHub repo
+nvolt join org/repo-name
+# or
+nvolt join --repo org/repo-name</code>
+                </div>
+
+                <h3>What it does</h3>
+                <ul>
+                    <li>Generates RSA-4096 keypair for this machine (if not already present)</li>
+                    <li>Registers machine's public key to the existing vault</li>
+                    <li>In global mode: clones the repository if it doesn't exist locally</li>
+                </ul>
+
+                <h3>After Joining</h3>
+                <p>After joining a vault, you'll need someone with push access to grant your machine access to specific environments:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Someone with access runs:
+nvolt machine grant your-machine-id -e production</code>
+                </div>
+
+                <div class="info-box">
+                    <strong>Use Case:</strong> Use <code>nvolt join</code> when connecting to an existing vault that was created by someone else. Use <code>nvolt init</code> when creating a new vault for the first time.
+                </div>
+            </section>
+
             <section id="push">
                 <h2>nvolt push</h2>
                 <p>Encrypt and push secrets to the vault.</p>
@@ -334,6 +371,21 @@ nvolt run -p my-api -e production ./server</code>
                     <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                     <code>nvolt machine list</code>
                 </div>
+
+                <h3>Grant Access to a Machine</h3>
+                <p>Grant a specific machine access to decrypt secrets in an environment:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Grant access to default environment
+nvolt machine grant ci-server
+
+# Grant access to specific environment
+nvolt machine grant ci-server -e production
+
+# Grant access with project and environment
+nvolt machine grant alice-laptop -p myproject -e staging</code>
+                </div>
+                <p>This wraps the master key for the specified machine, allowing it to decrypt secrets.</p>
 
                 <h3>Remove a Machine</h3>
                 <p>Revoke access for a machine:</p>

@@ -168,6 +168,17 @@ func GetCurrentBranch(repoPath string) (string, error) {
 
 // SafePull performs a pull and checks for conflicts
 func SafePull(repoPath string) error {
+	// Check if there are remote branches (skip pull for empty repos)
+	hasRemote, err := HasRemoteBranches(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to check remote branches: %w", err)
+	}
+
+	// Skip pull for empty repositories
+	if !hasRemote {
+		return nil
+	}
+
 	// Check for uncommitted changes first
 	hasChanges, err := HasUncommittedChanges(repoPath)
 	if err != nil {

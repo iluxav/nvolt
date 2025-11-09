@@ -9,6 +9,7 @@ import (
 	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/iluxav/nvolt/pkg/types"
 	"github.com/spf13/cobra"
@@ -30,23 +31,22 @@ Examples:
 		environment, _ := cmd.Flags().GetString("env")
 		project, _ := cmd.Flags().GetString("project")
 		keyValues, _ := cmd.Flags().GetStringSlice("key")
-		autoGrant, _ := cmd.Flags().GetBool("auto-grant")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-		return runPush(envFile, environment, project, keyValues, autoGrant, dryRun)
+		return runPush(envFile, environment, project, keyValues, dryRun)
 	},
 }
 
-func runPush(envFile, environment, project string, keyValues []string, autoGrant, dryRun bool) error {
+func runPush(envFile, environment, project string, keyValues []string, dryRun bool) error {
 	// Ensure machine is initialized
 	if err := EnsureMachineInitialized(); err != nil {
 		return err
 	}
 
 	if dryRun {
-		fmt.Println("[DRY RUN] Simulating push operation...")
+		ui.Warning("[DRY RUN] Simulating push operation")
 	} else {
-		fmt.Println("Pushing secrets to vault...")
+		ui.Step("Pushing secrets to vault")
 	}
 
 	// Find vault path
@@ -60,11 +60,11 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
 
 		// Pull latest changes BEFORE doing any work
-		fmt.Println("Global mode: pulling latest changes...")
+		ui.Step("Pulling latest changes from repository")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
-		fmt.Println("✓ Pulled latest changes from repository")
+		ui.Success("Repository up to date")
 
 		// Detect or use provided project name
 		if project == "" {
@@ -77,7 +77,7 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 				return fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
 			}
 			project = detectedProject
-			fmt.Printf("Detected project: %s\n", project)
+			ui.PrintDetected("Project", project)
 		}
 	}
 
@@ -93,7 +93,7 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 		if err != nil {
 			return fmt.Errorf("failed to parse env file: %w", err)
 		}
-		fmt.Printf("Loaded %d secrets from %s\n", len(fileSecrets), envFile)
+		ui.Info(fmt.Sprintf("Loaded %d secrets from %s", len(fileSecrets), ui.Cyan(envFile)))
 		for k, v := range fileSecrets {
 			secrets[k] = v
 		}
@@ -108,7 +108,7 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 		if err != nil {
 			return fmt.Errorf("failed to parse key=value pairs: %w", err)
 		}
-		fmt.Printf("Adding %d secrets from command line\n", len(kvSecrets))
+		ui.Info(fmt.Sprintf("Adding %d secrets from command line", len(kvSecrets)))
 		for k, v := range kvSecrets {
 			secrets[k] = v
 		}
@@ -127,9 +127,9 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 	defer crypto.ZeroBytes(masterKey)
 
 	if isNew {
-		fmt.Println("✓ Generated new master key")
+		ui.Success("Generated new master key")
 	} else {
-		fmt.Println("✓ Using existing master key")
+		ui.Success("Using existing master key")
 	}
 
 	// Get current machine info for GrantedBy
@@ -138,20 +138,16 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 		return fmt.Errorf("failed to load machine info: %w", err)
 	}
 
-	// ALWAYS wrap master key for all machines (with permission control per environment)
-	// This ensures newly added machines can request access to specific environments
-	if autoGrant {
-		fmt.Println("Wrapping master key for all machines (auto-granting access)...")
-	} else {
-		fmt.Println("Wrapping master key for machines (will prompt for new machines)...")
-	}
-	if err := wrapMasterKeyForMachines(paths, environment, masterKey, machineInfo.ID, autoGrant); err != nil {
+	// Wrap master key for machines that already have access (and current machine)
+	// Use 'nvolt machine grant <machine-id>' to grant access to new machines
+	ui.Step("Wrapping master key for machines with access")
+	if err := vault.WrapMasterKeyForExistingMachines(paths, environment, masterKey, machineInfo.ID); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
 	}
-	fmt.Println("✓ Master key wrapping complete")
+	ui.Success("Master key wrapped for machines with access")
 
 	// Encrypt and save each secret
-	fmt.Printf("Encrypting %d secrets for environment '%s'...\n", len(secrets), environment)
+	ui.Step(fmt.Sprintf("Encrypting %d secrets for environment '%s'", len(secrets), ui.Cyan(environment)))
 	for key, value := range secrets {
 		encrypted, err := vault.EncryptSecret(masterKey, value)
 		if err != nil {
@@ -163,22 +159,22 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 				return fmt.Errorf("failed to save secret %s: %w", key, err)
 			}
 		} else {
-			fmt.Printf("  [DRY RUN] Would save secret: %s\n", key)
+			ui.Info(ui.Gray(fmt.Sprintf("  [DRY RUN] Would save secret: %s", key)))
 		}
 	}
 
-	fmt.Printf("\n✓ Successfully pushed %d secrets to vault\n", len(secrets))
-	fmt.Printf("  Environment: %s\n", environment)
-	fmt.Printf("  Vault: %s\n", vaultPath)
-	fmt.Println("\nSecrets encrypted:")
+	ui.Success(fmt.Sprintf("Successfully pushed %d secrets", len(secrets)))
+	ui.PrintKeyValue("  Environment", ui.Cyan(environment))
+	ui.PrintKeyValue("  Vault", ui.Gray(vaultPath))
+	ui.Section("Secrets encrypted:")
 	for key := range secrets {
-		fmt.Printf("  - %s\n", key)
+		ui.Substep(key)
 	}
 
 	// Auto-commit and push in global mode
 	if vault.IsGlobalMode(vaultPath) && !dryRun {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("\nGlobal mode: committing and pushing changes...")
+		ui.Step("Committing and pushing changes to repository")
 
 		// Generate commit message
 		commitMsg := fmt.Sprintf("Update secrets for project '%s' environment '%s'", project, environment)
@@ -188,13 +184,13 @@ func runPush(envFile, environment, project string, keyValues []string, autoGrant
 			return fmt.Errorf("failed to commit and push changes: %w", err)
 		}
 
-		fmt.Println("✓ Changes committed and pushed to repository")
+		ui.Success("Changes committed and pushed")
 	} else if vault.IsGlobalMode(vaultPath) && dryRun {
-		fmt.Println("\n[DRY RUN] Would commit and push changes to repository")
+		ui.Info(ui.Gray("\n[DRY RUN] Would commit and push changes to repository"))
 	}
 
 	if dryRun {
-		fmt.Println("\n[DRY RUN] No changes were made")
+		ui.Info(ui.Gray("\n[DRY RUN] No changes were made"))
 	}
 
 	return nil
@@ -257,18 +253,12 @@ func unwrapMasterKey(paths *vault.Paths, environment string) ([]byte, error) {
 	return masterKey, nil
 }
 
-// wrapMasterKeyForMachines wraps the master key for all machines in the vault
-// This is a wrapper around vault.WrapMasterKeyForMachines
-func wrapMasterKeyForMachines(paths *vault.Paths, environment string, masterKey []byte, grantedBy string, autoGrant bool) error {
-	return vault.WrapMasterKeyForMachines(paths, environment, masterKey, grantedBy, autoGrant)
-}
 
 func init() {
 	pushCmd.Flags().StringP("file", "f", "", "Environment file to encrypt")
 	pushCmd.Flags().StringP("env", "e", "default", "Environment name")
 	pushCmd.Flags().StringP("project", "p", "", "Project name (auto-detected if not specified)")
 	pushCmd.Flags().StringSliceP("key", "k", []string{}, "Key=value pairs (can be specified multiple times)")
-	pushCmd.Flags().Bool("auto-grant", false, "Automatically grant access to all machines without prompting")
 	pushCmd.Flags().Bool("dry-run", false, "Show what would be done without making any changes")
 	rootCmd.AddCommand(pushCmd)
 }

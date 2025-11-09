@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -50,21 +51,23 @@ func runVaultShow() error {
 	// For now, we use empty project name which works for local mode
 	paths := vault.GetVaultPaths(vaultPath, "")
 
-	fmt.Printf("Vault Information\n")
-	fmt.Printf("=================\n\n")
+	ui.Section("Vault Information")
+	fmt.Println()
 
 	// Show vault location
-	fmt.Printf("Vault Location: %s\n\n", vaultPath)
+	ui.PrintKeyValue("Vault Location", ui.Gray(vaultPath))
+	fmt.Println()
 
 	// Get current machine info
 	currentMachineInfo, err := vault.LoadMachineInfo()
 	if err != nil {
-		fmt.Printf("Warning: Could not load current machine info: %v\n\n", err)
+		ui.Warning("Could not load current machine info: %v\n", err)
 	} else {
-		fmt.Printf("Current Machine:\n")
-		fmt.Printf("  ID:          %s\n", currentMachineInfo.ID)
-		fmt.Printf("  Hostname:    %s\n", currentMachineInfo.Hostname)
-		fmt.Printf("  Fingerprint: %s\n\n", currentMachineInfo.Fingerprint)
+		ui.Section("Current Machine:")
+		ui.PrintKeyValue("  ID", ui.Cyan(currentMachineInfo.ID))
+		ui.PrintKeyValue("  Hostname", currentMachineInfo.Hostname)
+		ui.PrintKeyValue("  Fingerprint", ui.Gray(currentMachineInfo.Fingerprint))
+		fmt.Println()
 	}
 
 	// List all machines
@@ -76,7 +79,7 @@ func runVaultShow() error {
 	// List environments first to show access per environment
 	envDirs, err := vault.ListDirs(paths.Secrets)
 	if err != nil {
-		fmt.Printf("Warning: Could not list environments: %v\n\n", err)
+		ui.Warning("Could not list environments: %v", err)
 		envDirs = []string{}
 	}
 
@@ -85,57 +88,60 @@ func runVaultShow() error {
 		environments = append(environments, vault.GetDirName(envDir))
 	}
 
-	fmt.Printf("Registered Machines (%d):\n", len(machines))
+	ui.Section(fmt.Sprintf("Registered Machines (%d):", len(machines)))
 	if len(machines) == 0 {
-		fmt.Printf("  (none)\n")
+		ui.Info(ui.Gray("  (none)"))
 	} else {
 		for _, m := range machines {
-			fmt.Printf("\n  Machine: %s\n", m.ID)
-			fmt.Printf("    Hostname:    %s\n", m.Hostname)
-			fmt.Printf("    Fingerprint: %s\n", m.Fingerprint)
-			fmt.Printf("    Created:     %s\n", m.CreatedAt.Format(time.RFC3339))
+			fmt.Println()
+			ui.Info(fmt.Sprintf("  Machine: %s", ui.Cyan(m.ID)))
+			ui.PrintKeyValue("    Hostname", m.Hostname)
+			ui.PrintKeyValue("    Fingerprint", ui.Gray(m.Fingerprint))
+			ui.PrintKeyValue("    Created", ui.Gray(m.CreatedAt.Format(time.RFC3339)))
 			if m.Description != "" {
-				fmt.Printf("    Description: %s\n", m.Description)
+				ui.PrintKeyValue("    Description", m.Description)
 			}
 
 			// Check access for each environment
 			if len(environments) > 0 {
-				fmt.Printf("    Access:\n")
+				ui.Info("    Access:")
 				for _, env := range environments {
 					wrappedKeyPath := paths.GetWrappedKeyPath(env, m.ID)
 					hasKey := vault.FileExists(wrappedKeyPath)
 					if hasKey {
-						fmt.Printf("      %s: ✓\n", env)
+						ui.Info(fmt.Sprintf("      %s: %s", ui.Cyan(env), ui.BrightGreen("✓")))
 					} else {
-						fmt.Printf("      %s: ✗\n", env)
+						ui.Info(fmt.Sprintf("      %s: %s", ui.Gray(env), ui.Gray("✗")))
 					}
 				}
 			} else {
-				fmt.Printf("    Access:      (no environments)\n")
+				ui.Info(ui.Gray("    Access: (no environments)"))
 			}
 		}
 	}
 
-	fmt.Printf("\n")
+	fmt.Println()
 
 	// List environments
 	envDirs, err = vault.ListDirs(paths.Secrets)
 	if err != nil {
-		fmt.Printf("Environments: (error listing: %v)\n\n", err)
+		ui.Warning("Environments: (error listing: %v)", err)
+		fmt.Println()
 	} else if len(envDirs) == 0 {
-		fmt.Printf("Environments: (none)\n\n")
+		ui.Info(ui.Gray("Environments: (none)"))
+		fmt.Println()
 	} else {
-		fmt.Printf("Environments (%d):\n", len(envDirs))
+		ui.Section(fmt.Sprintf("Environments (%d):", len(envDirs)))
 		for _, envDir := range envDirs {
 			envName := vault.GetDirName(envDir)
 			secretFiles, err := vault.ListFiles(envDir)
 			if err != nil {
-				fmt.Printf("  - %s (error: %v)\n", envName, err)
+				ui.Substep(fmt.Sprintf("%s %s", ui.Cyan(envName), ui.Red(fmt.Sprintf("(error: %v)", err))))
 			} else {
-				fmt.Printf("  - %s (%d secret(s))\n", envName, len(secretFiles))
+				ui.Substep(fmt.Sprintf("%s (%d secret(s))", ui.Cyan(envName), len(secretFiles)))
 			}
 		}
-		fmt.Printf("\n")
+		fmt.Println()
 	}
 
 	return nil
@@ -152,26 +158,26 @@ func runVaultVerify() error {
 	// For now, we use empty project name which works for local mode
 	paths := vault.GetVaultPaths(vaultPath, "")
 
-	fmt.Printf("Verifying Vault Integrity\n")
-	fmt.Printf("=========================\n\n")
+	ui.Section("Verifying Vault Integrity")
+	fmt.Println()
 
 	errors := []string{}
 	warnings := []string{}
 
 	// Check vault structure
-	fmt.Printf("Checking vault structure...\n")
+	ui.Step("Checking vault structure")
 	if err := vault.ValidateVaultStructure(vaultPath); err != nil {
 		errors = append(errors, fmt.Sprintf("Vault structure invalid: %v", err))
 	} else {
-		fmt.Printf("✓ Vault structure is valid\n")
+		ui.Success("Vault structure is valid")
 	}
 
 	// Check Git security
-	fmt.Printf("\nChecking Git security...\n")
+	ui.Step("Checking Git security")
 	if err := vault.EnsurePrivateKeysNotInGit(vaultPath); err != nil {
 		errors = append(errors, fmt.Sprintf("Private key security issue: %v", err))
 	} else {
-		fmt.Printf("✓ Private keys are not in Git repository\n")
+		ui.Success("Private keys are not in Git repository")
 	}
 
 	// Check .gitignore for sensitive patterns
@@ -183,40 +189,40 @@ func runVaultVerify() error {
 			warnings = append(warnings, fmt.Sprintf("Missing .gitignore pattern: %s", pattern))
 		}
 	} else {
-		fmt.Printf("✓ .gitignore properly configured for sensitive files\n")
+		ui.Success(".gitignore properly configured for sensitive files")
 	}
 
 	// Check current machine
-	fmt.Printf("\nChecking current machine...\n")
+	ui.Step("Checking current machine")
 	currentMachine, err := vault.LoadMachineInfo()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Cannot load current machine info: %v", err))
 	} else {
-		fmt.Printf("✓ Current machine: %s\n", currentMachine.ID)
+		ui.Success(fmt.Sprintf("Current machine: %s", ui.Cyan(currentMachine.ID)))
 
 		// List environments to check access
 		envDirs, err := vault.ListDirs(paths.Secrets)
 		if err == nil && len(envDirs) > 0 {
-			fmt.Printf("Checking access to environments...\n")
+			ui.Info("Checking access to environments...")
 			for _, envDir := range envDirs {
 				envName := vault.GetDirName(envDir)
 				_, err := vault.UnwrapMasterKey(paths, envName)
 				if err != nil {
 					warnings = append(warnings, fmt.Sprintf("Current machine cannot unwrap master key for '%s': %v", envName, err))
 				} else {
-					fmt.Printf("  ✓ Can access '%s'\n", envName)
+					ui.Info(fmt.Sprintf("  %s Can access '%s'", ui.BrightGreen("✓"), ui.Cyan(envName)))
 				}
 			}
 		}
 	}
 
 	// Check machines
-	fmt.Printf("\nChecking registered machines...\n")
+	ui.Step("Checking registered machines")
 	machines, err := vault.ListMachines(paths)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Cannot list machines: %v", err))
 	} else {
-		fmt.Printf("✓ Found %d machine(s)\n", len(machines))
+		ui.Success(fmt.Sprintf("Found %d machine(s)", len(machines)))
 
 		// Get list of environments
 		envDirs, err := vault.ListDirs(paths.Secrets)
@@ -246,7 +252,7 @@ func runVaultVerify() error {
 	}
 
 	// Check wrapped keys for orphans
-	fmt.Printf("\nChecking wrapped keys...\n")
+	ui.Step("Checking wrapped keys")
 
 	// Get list of environments
 	envDirs, err := vault.ListDirs(paths.Secrets)
@@ -288,11 +294,11 @@ func runVaultVerify() error {
 			}
 		}
 
-		fmt.Printf("✓ Found %d wrapped key(s) across all environments\n", totalWrappedKeys)
+		ui.Success(fmt.Sprintf("Found %d wrapped key(s) across all environments", totalWrappedKeys))
 	}
 
 	// Check secrets
-	fmt.Printf("\nChecking secrets...\n")
+	ui.Step("Checking secrets")
 	envDirs, err = vault.ListDirs(paths.Secrets)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Cannot list environments: %v", err))
@@ -306,34 +312,35 @@ func runVaultVerify() error {
 			}
 			totalSecrets += len(secretFiles)
 		}
-		fmt.Printf("✓ Found %d secret(s) across %d environment(s)\n", totalSecrets, len(envDirs))
+		ui.Success(fmt.Sprintf("Found %d secret(s) across %d environment(s)", totalSecrets, len(envDirs)))
 	}
 
 	// Print summary
-	fmt.Printf("\n")
-	fmt.Printf("Summary\n")
-	fmt.Printf("=======\n")
+	ui.Section("Summary")
 
 	if len(errors) > 0 {
-		fmt.Printf("\nErrors (%d):\n", len(errors))
+		fmt.Printf("\n%s (%d):\n", ui.Red("Errors"), len(errors))
 		for _, e := range errors {
-			fmt.Printf("  ✗ %s\n", e)
+			fmt.Printf("  %s %s\n", ui.Red("✗"), e)
 		}
 	}
 
 	if len(warnings) > 0 {
-		fmt.Printf("\nWarnings (%d):\n", len(warnings))
+		fmt.Printf("\n%s (%d):\n", ui.Yellow("Warnings"), len(warnings))
 		for _, w := range warnings {
-			fmt.Printf("  ⚠ %s\n", w)
+			fmt.Printf("  %s %s\n", ui.Yellow("⚠"), w)
 		}
 	}
 
 	if len(errors) == 0 && len(warnings) == 0 {
-		fmt.Printf("\n✓ Vault is healthy - no issues found\n")
+		fmt.Println()
+		ui.Success("Vault is healthy - no issues found")
 	} else if len(errors) == 0 {
-		fmt.Printf("\n✓ Vault is functional but has warnings\n")
+		fmt.Println()
+		ui.Success("Vault is functional but has warnings")
 	} else {
-		fmt.Printf("\n✗ Vault has errors that need attention\n")
+		fmt.Println()
+		ui.Error("Vault has errors that need attention")
 		return fmt.Errorf("vault verification failed with %d error(s)", len(errors))
 	}
 

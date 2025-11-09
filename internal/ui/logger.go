@@ -106,7 +106,7 @@ func (l *Logger) Debug(format string, args ...interface{}) {
 // Success prints a success message with a checkmark
 func Success(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	Info(BrightGreen("✓")+" "+msg, args...)
+	Info(BrightGreen("✓") + " " + msg)
 }
 
 // Step prints a step indicator

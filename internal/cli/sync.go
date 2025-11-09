@@ -7,6 +7,7 @@ import (
 	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
 	"github.com/iluxav/nvolt/internal/git"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -47,11 +48,11 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 	// This ensures we have the latest machine keys from other machines
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("Global mode: pulling latest changes...")
+		ui.Step("Pulling latest changes from repository")
 		if err := git.SafePull(repoPath); err != nil {
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
-		fmt.Println("✓ Pulled latest changes from repository")
+		ui.Success("Repository up to date")
 	}
 
 	// Get current machine info
@@ -79,7 +80,7 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 	var masterKey []byte
 
 	if rotate {
-		fmt.Printf("Rotating master key for environment '%s'...\n", environment)
+		ui.Step(fmt.Sprintf("Rotating master key for environment '%s'", ui.Cyan(environment)))
 
 		// Load existing master key first to re-encrypt secrets
 		oldMasterKey, err := vault.UnwrapMasterKey(paths, environment)
@@ -98,9 +99,9 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 			return fmt.Errorf("failed to re-encrypt secrets: %w", err)
 		}
 
-		fmt.Println("✓ Generated new master key and re-encrypted all secrets")
+		ui.Success("Generated new master key and re-encrypted all secrets")
 	} else {
-		fmt.Printf("Re-wrapping master key for environment '%s' for all machines...\n", environment)
+		ui.Step(fmt.Sprintf("Re-wrapping master key for environment '%s'", ui.Cyan(environment)))
 
 		// Load existing master key
 		masterKey, err = vault.UnwrapMasterKey(paths, environment)
@@ -108,14 +109,14 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 			return fmt.Errorf("failed to unwrap master key: %w", err)
 		}
 
-		fmt.Println("✓ Loaded existing master key")
+		ui.Success("Loaded existing master key")
 	}
 
 	// Wrap master key for all machines
 	if autoGrant {
-		fmt.Println("Auto-granting access to all machines...")
+		ui.Step("Wrapping master key for all machines (auto-granting access)")
 	} else {
-		fmt.Println("Wrapping master key for machines (will prompt for new machines)...")
+		ui.Step("Wrapping master key for machines")
 	}
 	if err := vault.WrapMasterKeyForMachines(paths, environment, masterKey, machineInfo.ID, autoGrant); err != nil {
 		return fmt.Errorf("failed to wrap master key: %w", err)
@@ -127,21 +128,23 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 		return fmt.Errorf("failed to list machines: %w", err)
 	}
 
-	fmt.Printf("\n✓ Master key wrapped for %d machine(s):\n", len(machines))
+	ui.Success(fmt.Sprintf("Master key wrapped for %d machine(s)", len(machines)))
 	for _, m := range machines {
-		fmt.Printf("  - %s (%s)\n", m.ID, m.Hostname)
+		ui.Substep(fmt.Sprintf("%s (%s)", ui.Cyan(m.ID), ui.Gray(m.Hostname)))
 	}
 
 	if rotate {
-		fmt.Println("\nNote: The master key has been rotated. All machines can now decrypt secrets with the new key.")
+		fmt.Println()
+		ui.Info(ui.Yellow("Note: ") + "The master key has been rotated. All machines can now decrypt secrets with the new key.")
 	} else {
-		fmt.Println("\nNote: All machines now have access to decrypt secrets.")
+		fmt.Println()
+		ui.Info(ui.Yellow("Note: ") + "All machines now have access to decrypt secrets.")
 	}
 
 	// Auto-commit and push in global mode
 	if vault.IsGlobalMode(vaultPath) {
 		repoPath := vault.GetRepoPathFromVault(vaultPath)
-		fmt.Println("\nGlobal mode: committing and pushing changes...")
+		ui.Step("Committing and pushing changes to repository")
 
 		// Generate commit message
 		var commitMsg string
@@ -156,7 +159,7 @@ func runSync(rotate bool, environment string, autoGrant bool) error {
 			return fmt.Errorf("failed to commit and push changes: %w", err)
 		}
 
-		fmt.Println("✓ Changes committed and pushed to repository")
+		ui.Success("Changes committed and pushed")
 	}
 
 	return nil
@@ -171,11 +174,11 @@ func rotateSecretsEncryption(paths *vault.Paths, environment string, oldKey, new
 	}
 
 	if len(secretFiles) == 0 {
-		fmt.Printf("No secrets found in environment '%s' to re-encrypt\n", environment)
+		ui.Info(fmt.Sprintf("No secrets found in environment '%s' to re-encrypt", ui.Cyan(environment)))
 		return nil
 	}
 
-	fmt.Printf("Re-encrypting %d secret(s) in environment '%s'...\n", len(secretFiles), environment)
+	ui.Step(fmt.Sprintf("Re-encrypting %d secret(s) in environment '%s'", len(secretFiles), ui.Cyan(environment)))
 
 	for _, secretFile := range secretFiles {
 		// Extract key name from filename
@@ -205,7 +208,7 @@ func rotateSecretsEncryption(paths *vault.Paths, environment string, oldKey, new
 		}
 	}
 
-	fmt.Printf("✓ Re-encrypted %d secret(s)\n", len(secretFiles))
+	ui.Success(fmt.Sprintf("Re-encrypted %d secret(s)", len(secretFiles)))
 
 	return nil
 }

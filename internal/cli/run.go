@@ -9,6 +9,7 @@ import (
 
 	"github.com/iluxav/nvolt/internal/config"
 	"github.com/iluxav/nvolt/internal/crypto"
+	"github.com/iluxav/nvolt/internal/ui"
 	"github.com/iluxav/nvolt/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -119,8 +120,8 @@ func runWithSecrets(environment string, cmdArgs []string) error {
 		return fmt.Errorf("no secrets could be decrypted")
 	}
 
-	fmt.Printf("✓ Loaded %d secrets from environment '%s'\n", len(secrets), environment)
-	fmt.Printf("Running: %s\n\n", strings.Join(cmdArgs, " "))
+	ui.Success(fmt.Sprintf("Loaded %d secrets from environment '%s'", len(secrets), ui.Cyan(environment)))
+	ui.Info(fmt.Sprintf("Running: %s\n", ui.Gray(strings.Join(cmdArgs, " "))))
 
 	// Prepare environment
 	env := os.Environ()

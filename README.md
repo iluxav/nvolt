@@ -118,7 +118,7 @@ nvolt pull -e production
 
 ### `nvolt init`
 
-Initialize vault and generate machine keypair.
+Initialize a new vault and generate machine keypair.
 
 ```bash
 # Local mode (current directory)
@@ -131,6 +131,28 @@ nvolt init --repo org/secrets-repo
 **Flags:**
 
 - `--repo` - GitHub repository URL for global vault
+
+---
+
+### `nvolt join`
+
+Join an existing vault and register this machine.
+
+```bash
+# Local mode (vault in current directory)
+nvolt join
+
+# Global mode (vault in GitHub repo)
+nvolt join org/secrets-repo
+# or
+nvolt join --repo org/secrets-repo
+```
+
+**Flags:**
+
+- `--repo` - GitHub repository URL for global vault
+
+**Note:** After joining, you'll need someone with push access to grant your machine access to specific environments using `nvolt machine grant <your-machine-id>`.
 
 ---
 
@@ -210,6 +232,28 @@ Generate a new keypair for CI or another device.
 nvolt machine add ci-server
 nvolt machine add alice-laptop
 ```
+
+---
+
+### `nvolt machine grant`
+
+Grant a machine access to decrypt secrets in an environment.
+
+```bash
+# Grant access to default environment
+nvolt machine grant ci-server
+
+# Grant access to specific environment
+nvolt machine grant ci-server -e production
+
+# Grant access with project and environment
+nvolt machine grant alice-laptop -p myproject -e staging
+```
+
+**Flags:**
+
+- `-e, --env` - Environment name (default: "default")
+- `-p, --project` - Project name (auto-detected if not specified)
 
 ---
 
