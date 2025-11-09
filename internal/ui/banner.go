@@ -38,7 +38,7 @@ func PrintLogoWithVersion(version string) {
 	PrintLogo()
 	fmt.Printf("\n    %s • %s\n\n",
 		Cyan("Zero-Trust Secret Manager"),
-		Gray("v"+version))
+		Gray(version))
 }
 
 // PrintBanner prints a banner with the logo and a message

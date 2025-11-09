@@ -194,6 +194,16 @@ func SafePull(repoPath string) error {
 	return nil
 }
 
+// HasRemoteBranches checks if the repository has any remote branches
+func HasRemoteBranches(repoPath string) (bool, error) {
+	cmd := exec.Command("git", "-C", repoPath, "ls-remote", "--heads", "origin")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("failed to check remote branches: %w", err)
+	}
+	return strings.TrimSpace(string(output)) != "", nil
+}
+
 // CommitAndPush commits changes and pushes to remote
 func CommitAndPush(repoPath, message string, paths ...string) error {
 	// Add specified paths first (before pull)
@@ -208,14 +218,32 @@ func CommitAndPush(repoPath, message string, paths ...string) error {
 		return fmt.Errorf("failed to commit: %w", err)
 	}
 
-	// Pull with rebase to integrate remote changes
-	if err := Pull(repoPath); err != nil {
-		return fmt.Errorf("failed to pull before push: %w", err)
+	// Check if there are remote branches (skip pull for empty repos)
+	hasRemote, err := HasRemoteBranches(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to check remote branches: %w", err)
+	}
+
+	// Only pull if there are remote branches
+	if hasRemote {
+		if err := Pull(repoPath); err != nil {
+			return fmt.Errorf("failed to pull before push: %w", err)
+		}
 	}
 
 	// Push to remote
-	if err := Push(repoPath); err != nil {
-		return fmt.Errorf("failed to push: %w", err)
+	if !hasRemote {
+		// For empty repos (no remote branches), use --set-upstream on first push
+		cmd := exec.Command("git", "-C", repoPath, "push", "--set-upstream", "origin", "HEAD")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git push --set-upstream failed: %w\nOutput: %s", err, string(output))
+		}
+	} else {
+		// Normal push for repos with existing remote branches
+		if err := Push(repoPath); err != nil {
+			return fmt.Errorf("failed to push: %w", err)
+		}
 	}
 
 	return nil
