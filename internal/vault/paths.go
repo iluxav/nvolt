@@ -193,19 +193,29 @@ func IsVaultInitialized(vaultPath string) bool {
 	return info.IsDir()
 }
 
-// IsMachineInitialized checks if the machine keypair exists
+// IsMachineInitialized checks if the machine keypair and info exist
 func IsMachineInitialized() (bool, error) {
 	homePaths, err := GetHomePaths()
 	if err != nil {
 		return false, err
 	}
 
+	// Check if private key exists
 	_, err = os.Stat(homePaths.PrivateKey)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("failed to check private key: %w", err)
+	}
+
+	// Check if machine info exists
+	_, err = os.Stat(homePaths.MachineInfo)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to check machine info: %w", err)
 	}
 
 	return true, nil

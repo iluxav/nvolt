@@ -77,8 +77,11 @@ func InitializeMachine(customName string) (*types.MachineInfo, error) {
 
 	// Save machine info
 	if err := SaveMachineInfo(homePaths.MachineInfo, machineInfo); err != nil {
-		// Clean up private key on error
-		DeleteFile(homePaths.PrivateKey)
+		// Clean up private key on error (use secure delete for sensitive key material)
+		if cleanupErr := SecureDeleteFile(homePaths.PrivateKey); cleanupErr != nil {
+			// Log cleanup failure but return original error
+			return nil, fmt.Errorf("failed to save machine info: %w (WARNING: private key cleanup also failed: %v)", err, cleanupErr)
+		}
 		return nil, fmt.Errorf("failed to save machine info: %w", err)
 	}
 
