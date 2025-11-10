@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="nvolt documentation - Learn how to use nvolt, the zero-trust, git-native secret manager for developers.">
+    <title>Documentation - nvolt</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/logo.png">
+    <link rel="shortcut icon" href="assets/logo.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/logo.png">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="docs-body">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <a href="index.html" class="logo">
+                    <img src="assets/logo.png" alt="nvolt logo" width="140" height="auto">
+                </a>
+                <div class="nav-links">
+                    <a href="index.html#features">Features</a>
+                    <a href="index.html#how-it-works">How It Works</a>
+                    <a href="index.html#comparison">Comparison</a>
+                    <a href="docs.html" class="active">Docs</a>
+                    <a href="https://github.com/iluxav/nvolt" target="_blank" rel="noopener">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-container">
+        <!-- Sidebar -->
+        <aside class="docs-sidebar">
+            <nav class="docs-nav">
+                <div class="docs-section">
+                    <h4>Getting Started</h4>
+                    <ul>
+                        <li><a href="#installation">Installation</a></li>
+                        <li><a href="#quick-start">Quick Start</a></li>
+                        <li><a href="#concepts">Core Concepts</a></li>
+                    </ul>
+                </div>
+
+                <div class="docs-section">
+                    <h4>Usage</h4>
+                    <ul>
+                        <li><a href="#init">nvolt init</a></li>
+                        <li><a href="#join">nvolt join</a></li>
+                        <li><a href="#push">nvolt push</a></li>
+                        <li><a href="#pull">nvolt pull</a></li>
+                        <li><a href="#run">nvolt run</a></li>
+                        <li><a href="#machine">Machine Management</a></li>
+                        <li><a href="#vault">Vault Commands</a></li>
+                    </ul>
+                </div>
+
+                <div class="docs-section">
+                    <h4>Advanced</h4>
+                    <ul>
+                        <li><a href="#modes">Local vs Global Mode</a></li>
+                        <li><a href="#environments">Environments</a></li>
+                        <li><a href="#access-control">Access Control</a></li>
+                        <li><a href="#key-rotation">Key Rotation</a></li>
+                    </ul>
+                </div>
+
+                <div class="docs-section">
+                    <h4>Security</h4>
+                    <ul>
+                        <li><a href="#cryptography">Cryptography</a></li>
+                        <li><a href="#best-practices">Best Practices</a></li>
+                    </ul>
+                </div>
+
+                <div class="docs-section">
+                    <h4>CI/CD</h4>
+                    <ul>
+                        <li><a href="#github-actions">GitHub Actions</a></li>
+                        <li><a href="#gitlab-ci">GitLab CI</a></li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="docs-content">
+            <h1>nvolt Documentation</h1>
+            <p class="lead">Learn how to securely manage your environment variables with nvolt.</p>
+
+            <!-- Installation -->
+            <section id="installation">
+                <h2>Installation</h2>
+
+                <h3>macOS</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>brew install nvolt</code>
+                </div>
+
+                <h3>Linux</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>curl -fsSL https://install.nvolt.io/latest/install.sh | bash</code>
+                </div>
+
+                <h3>From Source</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>git clone https://github.com/iluxav/nvolt.git
+cd nvolt
+go build -o nvolt ./cmd/nvolt
+sudo mv nvolt /usr/local/bin/</code>
+                </div>
+
+                <h3>Verify Installation</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt --version</code>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section id="quick-start">
+                <h2>Quick Start</h2>
+                <p>Get up and running with nvolt in under a minute:</p>
+
+                <h3>1. Initialize a Vault</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Initialize in current directory (local mode)
+nvolt init
+
+# OR initialize with a GitHub repo (global mode)
+nvolt init --repo my-org/nvolt-secrets</code>
+                </div>
+
+                <h3>2. Push Your Secrets</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># From a .env file
+nvolt push -f .env.production -e production
+
+# Or set secrets directly with -k flag
+nvolt push -k DATABASE_URL=postgres://localhost:5432/mydb -k API_KEY=secret123</code>
+                </div>
+
+                <h3>3. Pull Secrets</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># View secrets
+nvolt pull -e production
+
+# Write to file
+nvolt pull -e production > .env</code>
+                </div>
+
+                <h3>4. Run Your Application</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Load secrets and run command
+nvolt run -e production npm start</code>
+                </div>
+            </section>
+
+            <!-- Core Concepts -->
+            <section id="concepts">
+                <h2>Core Concepts</h2>
+
+                <h3>Projects</h3>
+                <p>A project represents your application. nvolt automatically detects the project name from:</p>
+                <ul>
+                    <li><code>package.json</code> → <code>name</code> (Node.js)</li>
+                    <li><code>go.mod</code> → full module path (Go)</li>
+                    <li><code>Cargo.toml</code> → <code>package.name</code> (Rust)</li>
+                    <li><code>pyproject.toml</code> → <code>project.name</code> (Python)</li>
+                    <li>Current directory name (fallback)</li>
+                </ul>
+                <p>You can override the project name with <code>-p my-project</code>.</p>
+
+                <h3>Environments</h3>
+                <p>Environments separate secrets for different deployment stages:</p>
+                <ul>
+                    <li><code>default</code> - Development (default)</li>
+                    <li><code>staging</code> - Staging environment</li>
+                    <li><code>production</code> - Production environment</li>
+                    <li>Custom environments as needed</li>
+                </ul>
+
+                <h3>Machines</h3>
+                <p>Each device or CI server is a "machine" with its own RSA keypair:</p>
+                <ul>
+                    <li>Private key stays on the machine (<code>~/.nvolt/private_key.pem</code>)</li>
+                    <li>Public key is stored in the vault (<code>.nvolt/machines/</code>)</li>
+                    <li>Machines must be granted access to decrypt secrets</li>
+                </ul>
+
+                <h3>Wrapped Keys</h3>
+                <p>Secrets are encrypted with a master key. The master key is "wrapped" (encrypted) for each authorized machine using their public key. This allows:</p>
+                <ul>
+                    <li>Per-machine access control</li>
+                    <li>Easy machine revocation</li>
+                    <li>Key rotation without re-encrypting all secrets</li>
+                </ul>
+            </section>
+
+            <!-- Commands -->
+            <section id="init">
+                <h2>nvolt init</h2>
+                <p>Initialize a new vault and generate machine keypair.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Local mode - vault in current directory
+nvolt init
+
+# Global mode - vault in GitHub repo
+nvolt init --repo org/repo-name</code>
+                </div>
+
+                <h3>What it does</h3>
+                <ul>
+                    <li>Generates RSA-4096 keypair for this machine</li>
+                    <li>Stores private key at <code>~/.nvolt/private_key.pem</code></li>
+                    <li>Creates vault structure at <code>.nvolt/</code> or <code>~/.nvolt/orgs/org/repo/</code></li>
+                    <li>In global mode: clones the repository if it doesn't exist</li>
+                </ul>
+            </section>
+
+            <section id="join">
+                <h2>nvolt join</h2>
+                <p>Join an existing vault and register this machine.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Local mode - vault in current directory
+nvolt join
+
+# Global mode - vault in GitHub repo
+nvolt join org/repo-name
+# or
+nvolt join --repo org/repo-name</code>
+                </div>
+
+                <h3>What it does</h3>
+                <ul>
+                    <li>Generates RSA-4096 keypair for this machine (if not already present)</li>
+                    <li>Registers machine's public key to the existing vault</li>
+                    <li>In global mode: clones the repository if it doesn't exist locally</li>
+                </ul>
+
+                <h3>After Joining</h3>
+                <p>After joining a vault, you'll need someone with push access to grant your machine access to specific environments:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Someone with access runs:
+nvolt machine grant your-machine-id -e production</code>
+                </div>
+
+                <div class="info-box">
+                    <strong>Use Case:</strong> Use <code>nvolt join</code> when connecting to an existing vault that was created by someone else. Use <code>nvolt init</code> when creating a new vault for the first time.
+                </div>
+            </section>
+
+            <section id="push">
+                <h2>nvolt push</h2>
+                <p>Encrypt and push secrets to the vault.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># From .env file
+nvolt push -f .env.production -e production
+
+# Set individual secrets with -k flag
+nvolt push -k API_KEY=abc123 -k DB_PASSWORD=secret
+
+# Multiple secrets and specify project name
+nvolt push -k API_KEY=abc123 -k DB_SECRET=xyz789 -p my-backend -e staging</code>
+                </div>
+
+                <h3>Flags</h3>
+                <ul>
+                    <li><code>-f, --file</code> - Path to .env file</li>
+                    <li><code>-k, --key</code> - Key=value pairs (can be specified multiple times)</li>
+                    <li><code>-e, --env</code> - Environment name (default: "default")</li>
+                    <li><code>-p, --project</code> - Project name (auto-detected if not specified)</li>
+                </ul>
+            </section>
+
+            <section id="pull">
+                <h2>nvolt pull</h2>
+                <p>Decrypt and retrieve secrets from the vault.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Print secrets to stdout
+nvolt pull -e production
+
+# Write to file
+nvolt pull -e production > .env.local
+
+# Different project
+nvolt pull -p my-backend -e staging</code>
+                </div>
+
+                <h3>Flags</h3>
+                <ul>
+                    <li><code>-e, --env</code> - Environment name</li>
+                    <li><code>-p, --project</code> - Project name</li>
+                </ul>
+
+                <h3>Output Format</h3>
+                <p>Secrets are output in .env format:</p>
+                <div class="code-block">
+                    <code>DATABASE_URL=postgres://localhost:5432/mydb
+API_KEY=abc123xyz
+SECRET_TOKEN=super-secret</code>
+                </div>
+            </section>
+
+            <section id="run">
+                <h2>nvolt run</h2>
+                <p>Load secrets into environment and run a command.</p>
+
+                <h3>Usage</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Run npm start with production secrets
+nvolt run -e production npm start
+
+# Run Python script
+nvolt run -e staging python app.py
+
+# Run with custom project
+nvolt run -p my-api -e production ./server</code>
+                </div>
+
+                <h3>Flags</h3>
+                <ul>
+                    <li><code>-e, --env</code> - Environment name</li>
+                    <li><code>-p, --project</code> - Project name</li>
+                    <li><code>-c, --command</code> - Command to run (alternative to positional args)</li>
+                </ul>
+            </section>
+
+            <section id="machine">
+                <h2>Machine Management</h2>
+
+                <h3>Add a Machine</h3>
+                <p>Generate a new keypair for another device or CI server:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt machine add ci-github-actions</code>
+                </div>
+                <p>This generates a private key that you can copy to the new machine.</p>
+
+                <h3>List Machines</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt machine list</code>
+                </div>
+
+                <h3>Grant Access to a Machine</h3>
+                <p>Grant a specific machine access to decrypt secrets in an environment:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Grant access to default environment
+nvolt machine grant ci-server
+
+# Grant access to specific environment
+nvolt machine grant ci-server -e production
+
+# Grant access with project and environment
+nvolt machine grant alice-laptop -p myproject -e staging</code>
+                </div>
+                <p>This wraps the master key for the specified machine, allowing it to decrypt secrets.</p>
+
+                <h3>Remove a Machine</h3>
+                <p>Revoke access for a machine:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt machine rm ci-github-actions</code>
+                </div>
+                <p>This removes the machine's wrapped keys, preventing it from decrypting secrets.</p>
+            </section>
+
+            <section id="vault">
+                <h2>Vault Commands</h2>
+
+                <h3>Show Vault Info</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt vault show</code>
+                </div>
+                <p>Displays:</p>
+                <ul>
+                    <li>Registered machines</li>
+                    <li>Projects and environments</li>
+                    <li>Access permissions</li>
+                </ul>
+
+                <h3>Verify Vault Integrity</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt vault verify</code>
+                </div>
+                <p>Verifies:</p>
+                <ul>
+                    <li>All encrypted files are readable</li>
+                    <li>Wrapped keys are valid</li>
+                    <li>No corruption in vault structure</li>
+                </ul>
+
+                <h3>Sync Vault</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Re-wrap keys after machine changes
+nvolt sync
+
+# Rotate master key
+nvolt sync --rotate</code>
+                </div>
+            </section>
+
+            <!-- Advanced -->
+            <section id="modes">
+                <h2>Local vs Global Mode</h2>
+
+                <h3>Local Mode</h3>
+                <p>Vault is stored in your project directory at <code>.nvolt/</code>.</p>
+
+                <div class="info-box">
+                    <strong>Use Case:</strong> Single repository, team uses Git to share encrypted secrets.
+                </div>
+
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Initialize
+cd my-project
+nvolt init
+
+# Vault is at ./nvolt/
+# Commit to Git
+git add .nvolt/
+git commit -m "Add encrypted secrets"
+git push</code>
+                </div>
+
+                <p><strong>Git Management:</strong> You control all Git operations (add, commit, push).</p>
+
+                <h3>Global Mode</h3>
+                <p>Vault is stored in a dedicated GitHub repository at <code>~/.nvolt/orgs/org/repo/</code>.</p>
+
+                <div class="info-box">
+                    <strong>Use Case:</strong> Share secrets across multiple projects in your organization.
+                </div>
+
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Initialize with repo
+nvolt init --repo my-org/nvolt-secrets
+
+# Vault is at ~/.nvolt/orgs/my-org/nvolt-secrets/
+# nvolt automatically handles Git operations</code>
+                </div>
+
+                <p><strong>Git Management:</strong> nvolt automatically pulls before reads and pushes after writes.</p>
+
+                <h3>Directory Structure Comparison</h3>
+
+                <h4>Local Mode</h4>
+                <div class="code-block">
+                    <code>my-project/
+├── .nvolt/
+│   ├── machines/
+│   ├── secrets/
+│   │   └── default/
+│   ├── wrapped_keys/
+│   │   └── default/
+│   └── keyinfo.json
+├── src/
+└── package.json</code>
+                </div>
+
+                <h4>Global Mode</h4>
+                <div class="code-block">
+                    <code>~/.nvolt/
+├── private_key.pem
+└── orgs/
+    └── my-org/
+        └── nvolt-secrets/
+            ├── machines/
+            ├── my-project/
+            │   ├── secrets/
+            │   │   ├── default/
+            │   │   └── production/
+            │   └── wrapped_keys/
+            └── another-project/</code>
+                </div>
+            </section>
+
+            <section id="environments">
+                <h2>Environments</h2>
+                <p>Separate secrets for different deployment stages.</p>
+
+                <h3>Creating Environments</h3>
+                <p>Environments are created automatically when you push secrets:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt push -f .env.dev -e development
+nvolt push -f .env.staging -e staging
+nvolt push -f .env.prod -e production</code>
+                </div>
+
+                <h3>Environment-Specific Access</h3>
+                <p>You can grant machines access to specific environments:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># CI gets staging access
+nvolt machine add ci-server
+# Push staging secrets - CI can now decrypt them
+nvolt push -f .env.staging -e staging
+
+# Production servers get production access only
+# They won't be able to decrypt staging secrets</code>
+                </div>
+            </section>
+
+            <section id="access-control">
+                <h2>Access Control</h2>
+
+                <h3>How It Works</h3>
+                <p>Access control in nvolt is cryptographically enforced:</p>
+
+                <ol>
+                    <li>Each machine has a unique RSA keypair</li>
+                    <li>Secrets are encrypted with a project master key</li>
+                    <li>The master key is wrapped (encrypted) for each authorized machine</li>
+                    <li>Only machines with a wrapped key can decrypt secrets</li>
+                </ol>
+
+                <h3>Granting Access</h3>
+                <p>When you add a machine and push secrets, that machine automatically gets access:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Add new machine
+nvolt machine add laptop-alice
+
+# Copy the generated private key to Alice's laptop
+# at ~/.nvolt/private_key.pem
+
+# Push or sync secrets - this wraps the master key for Alice
+nvolt sync</code>
+                </div>
+
+                <h3>Revoking Access</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code># Remove machine
+nvolt machine rm laptop-alice
+
+# Re-wrap keys for remaining machines
+nvolt sync</code>
+                </div>
+            </section>
+
+            <section id="key-rotation">
+                <h2>Key Rotation</h2>
+
+                <h3>When to Rotate</h3>
+                <ul>
+                    <li>A machine's private key may be compromised</li>
+                    <li>Regular security policy (e.g., every 90 days)</li>
+                    <li>After removing a team member</li>
+                </ul>
+
+                <h3>Rotating Master Key</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt sync --rotate</code>
+                </div>
+
+                <p>This will:</p>
+                <ol>
+                    <li>Generate a new master key</li>
+                    <li>Re-encrypt all secrets with the new key</li>
+                    <li>Wrap the new key for all authorized machines</li>
+                    <li>Delete the old master key</li>
+                </ol>
+
+                <div class="warning-box">
+                    <strong>⚠️ Warning:</strong> All machines will need to pull the updated vault after rotation.
+                </div>
+            </section>
+
+            <!-- Security -->
+            <section id="cryptography">
+                <h2>Cryptography</h2>
+
+                <h3>Algorithms Used</h3>
+                <ul>
+                    <li><strong>RSA-4096</strong> - Machine keypairs and key wrapping (OAEP with SHA256)</li>
+                    <li><strong>AES-256-GCM</strong> - Secret encryption (authenticated encryption)</li>
+                    <li><strong>SHA256</strong> - Key fingerprints and OAEP padding</li>
+                </ul>
+
+                <h3>Encryption Flow</h3>
+                <ol>
+                    <li>Generate project master key (32 bytes random)</li>
+                    <li>Encrypt each secret value with AES-256-GCM using master key</li>
+                    <li>Wrap master key for each machine using RSA-OAEP</li>
+                    <li>Store encrypted secrets and wrapped keys in vault</li>
+                </ol>
+
+                <h3>Decryption Flow</h3>
+                <ol>
+                    <li>Load machine's wrapped key from vault</li>
+                    <li>Decrypt wrapped key using machine's private RSA key</li>
+                    <li>Decrypt secret values using unwrapped master key</li>
+                    <li>Load secrets into environment</li>
+                </ol>
+
+                <h3>Security Properties</h3>
+                <ul>
+                    <li>✅ Confidentiality - Only authorized machines can decrypt</li>
+                    <li>✅ Integrity - GCM authentication prevents tampering</li>
+                    <li>✅ Forward Secrecy - Rotating master key protects past secrets</li>
+                    <li>✅ No Network Trust - All crypto happens locally</li>
+                </ul>
+            </section>
+
+            <section id="best-practices">
+                <h2>Security Best Practices</h2>
+
+                <h3>✅ Do</h3>
+                <ul>
+                    <li>Keep <code>~/.nvolt/private_key.pem</code> secure (permissions: 0600)</li>
+                    <li>Use separate environments for dev/staging/prod</li>
+                    <li>Rotate master keys regularly (e.g., every 90 days)</li>
+                    <li>Remove machines immediately when team members leave</li>
+                    <li>Use strong Git authentication (SSH keys, not HTTPS passwords)</li>
+                    <li>Enable Git repo access controls (private repos)</li>
+                    <li>Audit vault changes via Git history</li>
+                </ul>
+
+                <h3>❌ Don't</h3>
+                <ul>
+                    <li>Never commit <code>~/.nvolt/private_key.pem</code> to Git</li>
+                    <li>Never share private keys between machines</li>
+                    <li>Never store plaintext secrets in Git</li>
+                    <li>Don't use the same environment for dev and prod</li>
+                    <li>Don't skip machine removal when revoking access</li>
+                </ul>
+
+                <h3>Backup Strategy</h3>
+                <ol>
+                    <li>Vault is backed up via Git - just clone the repo</li>
+                    <li>Back up <code>~/.nvolt/private_key.pem</code> separately (encrypted backup)</li>
+                    <li>Document machine management procedures</li>
+                </ol>
+            </section>
+
+            <!-- CI/CD -->
+            <section id="github-actions">
+                <h2>GitHub Actions</h2>
+
+                <h3>Setup</h3>
+                <ol>
+                    <li>Generate a CI machine keypair:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt machine add ci-github-actions</code>
+                </div>
+
+                <ol start="2">
+                    <li>Copy the generated private key</li>
+                    <li>Add it as a GitHub secret: <code>NVOLT_PRIVATE_KEY</code></li>
+                    <li>Push your secrets to the vault:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt push -f .env.ci -e ci
+nvolt sync  # Wrap keys for the new CI machine</code>
+                </div>
+
+                <h3>Workflow Example</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install nvolt
+        run: |
+          curl -fsSL https://install.nvolt.io/latest/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup nvolt private key
+        run: |
+          mkdir -p ~/.nvolt
+          echo "${{ secrets.NVOLT_PRIVATE_KEY }}" > ~/.nvolt/private_key.pem
+          chmod 600 ~/.nvolt/private_key.pem
+
+      - name: Clone vault
+        run: |
+          git clone git@github.com:my-org/nvolt-secrets.git ~/.nvolt/orgs/my-org/nvolt-secrets
+
+      - name: Run app with secrets
+        run: |
+          nvolt run -e ci npm test</code>
+                </div>
+            </section>
+
+            <section id="gitlab-ci">
+                <h2>GitLab CI</h2>
+
+                <h3>Setup</h3>
+                <ol>
+                    <li>Generate a CI machine keypair:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt machine add ci-gitlab</code>
+                </div>
+
+                <ol start="2">
+                    <li>Add the private key as a GitLab CI/CD variable: <code>NVOLT_PRIVATE_KEY</code></li>
+                    <li>Mark it as "File" type</li>
+                    <li>Push secrets and sync:</li>
+                </ol>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>nvolt push -f .env.ci -e ci
+nvolt sync</code>
+                </div>
+
+                <h3>Pipeline Example</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    <code>stages:
+  - test
+  - deploy
+
+test:
+  stage: test
+  before_script:
+    - curl -fsSL https://install.nvolt.io/latest/install.sh | bash
+    - export PATH="$HOME/.local/bin:$PATH"
+    - mkdir -p ~/.nvolt
+    - cp $NVOLT_PRIVATE_KEY ~/.nvolt/private_key.pem
+    - chmod 600 ~/.nvolt/private_key.pem
+    - git clone git@gitlab.com:my-org/nvolt-secrets.git ~/.nvolt/orgs/my-org/nvolt-secrets
+  script:
+    - nvolt run -e ci npm test</code>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <div class="docs-footer">
+                <p>Need more help? <a href="https://github.com/iluxav/nvolt/discussions">Join the discussion</a> or <a href="https://github.com/iluxav/nvolt/issues">report an issue</a>.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Smooth scrolling for docs navigation
+        document.querySelectorAll('.docs-nav a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+
+                if (targetElement) {
+                    const offsetTop = targetElement.offsetTop - 100;
+                    window.scrollTo({
+                        top: offsetTop,
+                        behavior: 'smooth'
+                    });
+
+                    // Update active state
+                    document.querySelectorAll('.docs-nav a').forEach(a => a.classList.remove('active'));
+                    this.classList.add('active');
+                }
+            });
+        });
+
+        // Highlight active section on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('.docs-content section');
+            let current = '';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 150;
+                if (scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.docs-nav a').forEach(a => {
+                a.classList.remove('active');
+                if (a.getAttribute('href') === `#${current}`) {
+                    a.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="nvolt - Zero-Trust, Git-native secret manager. Encrypt environment variables locally, share securely across teams. No servers, no login, no infrastructure costs.">
+    <meta name="keywords" content="secret management, git-native secrets, zero-trust, encrypted environment variables, developer tools, devops, cli tool, open source">
+    <meta name="author" content="nvolt">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nvolt.io/">
+    <meta property="og:title" content="nvolt - Zero-Trust Git-Native Secret Manager">
+    <meta property="og:description" content="Secure environment variable manager built for developers. No servers, no login, just Git and cryptography.">
+
+    <!-- Schema.org markup -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "nvolt",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "description": "Zero-Trust, Git-native secret manager for developers",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <title>nvolt - Zero-Trust Git-Native Secret Manager for Developers</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/logo.png">
+    <link rel="shortcut icon" href="assets/logo.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/logo.png">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <a href="/" class="logo">
+                    <img src="assets/logo.png" alt="nvolt logo" width="140" height="auto">
+                </a>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#comparison">Comparison</a>
+                    <a href="docs.html">Docs</a>
+                    <a href="https://github.com/iluxav/nvolt" target="_blank" rel="noopener">GitHub</a>
+                </div>
+                <a href="#get-started" class="btn btn-primary">Get Started</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="badge">ZERO-TRUST SECURITY</div>
+                <h1>
+                    Secure Environment Variable Manager
+                    <span class="highlight">Built for Developers</span>
+                </h1>
+                <p class="hero-description">
+                    Zero-Trust secrets management with CLI-first workflow. Encrypt environment variables locally,
+                    share securely across teams, and inject secrets directly into your applicationsno .env files needed.
+                </p>
+                <div class="hero-cta">
+                    <a href="#get-started" class="btn btn-large btn-primary">Get Started Free</a>
+                    <a href="https://github.com/iluxav/nvolt" class="btn btn-large btn-secondary" target="_blank" rel="noopener">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-icon">
+                            <i data-lucide="lock" class="icon"></i>
+                        </div>
+                        <div>
+                            <div class="stat-value">Zero-Trust</div>
+                            <div class="stat-label">Local Encryption</div>
+                        </div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-icon">
+                            <i data-lucide="server-off" class="icon"></i>
+                        </div>
+                        <div>
+                            <div class="stat-value">No Backend</div>
+                            <div class="stat-label">Git-Native Storage</div>
+                        </div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-icon">
+                            <i data-lucide="dollar-sign" class="icon"></i>
+                        </div>
+                        <div>
+                            <div class="stat-value">$0/month</div>
+                            <div class="stat-label">Free Forever</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="quick-install-card">
+                <code>curl -fsSL https://install.nvolt.io/latest/install.sh | bash</code>
+                <button class="btn btn-small btn-secondary" onclick="copyCode(this)">Copy</button>
+            </div>
+            <div class="hero-terminal">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="terminal-title">terminal</div>
+                    </div>
+                    <div class="terminal-body">
+                        <code style="text-align: center;">
+                        <pre class="terminal-banner">
+   ███╗   ██╗██╗   ██╗ ██████╗ ██╗  ████████╗
+   ████╗  ██║██║   ██║██╔═══██╗██║  ╚══██╔══╝
+██╔██╗ ██║██║   ██║██║   ██║██║     ██║
+██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ██║
+██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗██║
+╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝╚═╝
+</pre>
+</code>
+                        <div class="terminal-line"><span class="prompt">$</span> nvolt init</div>
+                        <div class="terminal-line output"> Machine keypair generated</div>
+                        <div class="terminal-line output"> Vault initialized at .nvolt/</div>
+                        <div class="terminal-line"><span class="prompt">$</span> nvolt push -f .env.production</div>
+                        <div class="terminal-line output"> Encrypted 12 secrets</div>
+                        <div class="terminal-line output"> Secrets pushed to vault</div>
+                        <div class="terminal-line"><span class="prompt">$</span> nvolt run npm start</div>
+                        <div class="terminal-line output"> Loaded 12 secrets</div>
+                        <div class="terminal-line output"🚀 Server running on port 3000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problems Section -->
+    <section class="problems">
+        <div class="container">
+            <h2 class="section-title">Stop Managing Secrets the Hard Way</h2>
+            <div class="problems-grid">
+                <div class="problem-card">
+                    <div class="problem-icon">
+                    <i data-lucide="credit-card" class="icon-lg"></i>
+                </div>
+                    <h3>Expensive Backends</h3>
+                    <p>Monthly fees for Vault, Doppler, or AWS Secrets Manager add up quickly. You're paying for infrastructure you shouldn't need.</p>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">
+                    <i data-lucide="file-lock" class="icon-lg"></i>
+                </div>
+                    <h3>Plaintext .env Files</h3>
+                    <p>Storing secrets in .env files is risky. One accidental commit and your credentials are exposed forever.</p>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">
+                    <i data-lucide="key-round" class="icon-lg"></i>
+                </div>
+                    <h3>Complex Access Control</h3>
+                    <p>GPG-based tools like git-crypt require manual key management. Adding or removing team members is painful.</p>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-icon">
+                    <i data-lucide="building" class="icon-lg"></i>
+                </div>
+                    <h3>Vendor Lock-in</h3>
+                    <p>Cloud secret managers lock you into their ecosystem. Migration is complex and risky.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <h2 class="section-title">How nvolt Works</h2>
+            <p class="section-subtitle">Zero-Trust cryptography meets Git-native storage</p>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Generate Machine Keypairs</h3>
+                        <p>Each machine (laptop, CI server, production) gets a unique RSA-4096 keypair. Private keys never leave the machine.</p>
+                        <div class="code-block">
+                            <code>$ nvolt init</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Encrypt & Push Secrets</h3>
+                        <p>Secrets are encrypted with AES-256-GCM using a project master key. The master key is wrapped for each authorized machine.</p>
+                        <div class="code-block">
+                            <code>$ nvolt push -f .env.production -e production</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Store in Git</h3>
+                        <p>Encrypted secrets are committed to Git. Git controls who can access the ciphertext, nvolt controls who can decrypt it.</p>
+                        <div class="code-block">
+                            <code>$ git push origin main</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>Pull & Decrypt on Any Machine</h3>
+                        <p>Authorized machines unwrap the master key with their private key, then decrypt secrets locally.</p>
+                        <div class="code-block">
+                            <code>$ nvolt run npm start</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">Powerful Features, Zero Infrastructure</h2>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="shield-check" class="icon-lg"></i>
+                </div>
+                    <h3>Zero-Trust Architecture</h3>
+                    <p>All encryption happens locally on your machine. No backend servers, no API keys, no trust required.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="git-branch" class="icon-lg"></i>
+                </div>
+                    <h3>Git-Native Storage</h3>
+                    <p>Encrypted secrets live in Git alongside your code. Use your existing GitHub/GitLab infrastructure.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="key" class="icon-lg"></i>
+                </div>
+                    <h3>Per-Machine Access Control</h3>
+                    <p>Grant or revoke access per machine and environment. CI gets staging, production servers get production.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="layers" class="icon-lg"></i>
+                </div>
+                    <h3>Multi-Environment Support</h3>
+                    <p>Separate secrets for dev, staging, and production. Each environment has its own access controls.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="refresh-cw" class="icon-lg"></i>
+                </div>
+                    <h3>Key Rotation</h3>
+                    <p>Rotate master keys without re-encrypting all secrets. Remove compromised machines instantly.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="file-text" class="icon-lg"></i>
+                </div>
+                    <h3>Audit Trail</h3>
+                    <p>Every secret change is tracked in Git history. See who added what, when, and why.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="zap" class="icon-lg"></i>
+                </div>
+                    <h3>CLI-First Workflow</h3>
+                    <p>Beautiful terminal UI with color-coded output. Perfect for CI/CD pipelines and local development.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                    <i data-lucide="git-branch" class="icon-lg"></i>
+                </div>
+                    <h3>Free & Open Source</h3>
+                    <p>No monthly fees, no usage limits, no credit card required. Use it forever, for free.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison -->
+    <section id="comparison" class="comparison">
+        <div class="container">
+            <h2 class="section-title">How nvolt Compares</h2>
+            <p class="section-subtitle">Choose the right tool for your needs</p>
+
+            <div class="comparison-table-wrapper feature-card" style="padding: 0;">
+                <table class="comparison-table ">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th class="highlight-col">nvolt</th>
+                            <th>HashiCorp Vault</th>
+                            <th>Doppler</th>
+                            <th>Akeyless</th>
+                            <th>git-crypt</th>
+                            <th>SOPS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                         <tr>
+                            <td>Monthly Cost</td>
+                            <td class="highlight-col">
+                                Free
+                            </td>
+                            <td><i data-lucide="credit-card" class="table-icon-paid"></i> $$$</td>
+                            <td><i data-lucide="credit-card" class="table-icon-paid"></i> $$</td>
+                            <td><i data-lucide="credit-card" class="table-icon-paid"></i> $$</td>
+                            <td><i data-lucide="dollar-sign" class="table-icon-free"></i> $0</td>
+                            <td><i data-lucide="dollar-sign" class="table-icon-free"></i> $0</td>
+                                                <tr>
+                            <td>Zero-Knowledge</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="minus" class="table-icon-partial"></i> Self-hosted only</td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                        </tr>
+                        <tr>
+                            <td>No Backend</td>
+                            <td class="highlight-col">
+                                <i data-lucide="check" class="table-icon-yes"></i>
+                            </td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td> <i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td> <i data-lucide="check" class="table-icon-yes"></i></td>
+                        </tr>
+                       
+                        <tr>
+                            <td>No Login/Auth Required</td>
+                            <td class="highlight-col"> <i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td> <i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td> <i data-lucide="check" class="table-icon-yes"></i></td>
+                        </tr>
+                        <tr>
+                            <td>Per-Machine Access</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="minus" class="table-icon-partial"></i> GPG only</td>
+                            <td><i data-lucide="minus" class="table-icon-partial"></i> GPG only</td>
+                        </tr>
+                        <tr>
+                            <td>Environment-Based Access</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                        </tr>
+                        <tr>
+                            <td>Git-Native Storage</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                        </tr>
+                        <tr>
+                            <td>Multi-Project Support</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="minus" class="table-icon-partial"></i> Limited</td>
+                            <td><i data-lucide="minus" class="table-icon-partial"></i> Limited</td>
+                        </tr>
+                        <tr>
+                            <td>Active Maintenance</td>
+                            <td class="highlight-col"><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="alert-triangle" class="table-icon-warning"></i> BSL License</td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="check" class="table-icon-yes"></i></td>
+                            <td><i data-lucide="x" class="table-icon-no"></i> Unmaintained</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="use-cases">
+        <div class="container">
+            <h2 class="section-title">Perfect For</h2>
+
+            <div class="use-cases-grid">
+                <div class="use-case-card">
+                    <h3><i data-lucide="rocket" class="use-case-icon"></i> Startups & Solo Developers</h3>
+                    <p>No monthly costs, no infrastructure to maintain. Get enterprise-grade security without the enterprise price tag.</p>
+                </div>
+
+                <div class="use-case-card">
+                    <h3><i data-lucide="users" class="use-case-icon"></i> Small Teams</h3>
+                    <p>Securely share secrets across laptops and CI/CD. Everyone uses the tools they already know: Git and CLI.</p>
+                </div>
+
+                <div class="use-case-card">
+                    <h3><i data-lucide="shield" class="use-case-icon"></i> Security-Conscious Organizations</h3>
+                    <p>Zero-Trust architecture ensures no single point of failure. All cryptography happens on machines you control.</p>
+                </div>
+
+                <div class="use-case-card">
+                    <h3><i data-lucide="settings" class="use-case-icon"></i> CI/CD Pipelines</h3>
+                    <p>Grant CI servers access to specific environments. Secrets are loaded at runtime, never stored in CI config.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Get Started -->
+    <section id="get-started" class="get-started">
+        <div class="container">
+            <h2 class="section-title">Get Started in 60 Seconds</h2>
+
+            <div class="install-section">
+                <h3>Install nvolt</h3>
+                <div class="install-tabs">
+                    <button class="tab-btn active" data-tab="script">Quick Install (macOS/Linux/Windows)</button>
+                    <button class="tab-btn" data-tab="source">From Source</button>
+                </div>
+
+                <div class="tab-content active" data-tab="script">
+                    <div class="code-block large">
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        <code>curl -fsSL https://install.nvolt.io/latest/install.sh | bash</code>
+                    </div>
+                </div>
+
+                <div class="tab-content" data-tab="source">
+                    <div class="code-block large">
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        <code>git clone https://github.com/iluxav/nvolt.git
+cd nvolt
+go build -o nvolt ./cmd/nvolt
+sudo mv nvolt /usr/local/bin/</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="quick-start">
+                <h3>Quick Start</h3>
+                <div class="quick-start-steps">
+                    <div class="quick-step">
+                        <div class="step-num">1</div>
+                        <div class="step-info">
+                            <h4>Initialize vault</h4>
+                            <div class="code-block">
+                                <code>nvolt init</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-step">
+                        <div class="step-num">2</div>
+                        <div class="step-info">
+                            <h4>Push your secrets</h4>
+                            <div class="code-block">
+                                <code>nvolt push -f .env</code>
+                            </div>
+                            <span style="margin:6px 0; display:flex; opacity: 40%;">or</span>
+                            <div class="code-block">
+                                <code>nvolt push -k ENV1=secret1  -k ENV2=secret2</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-step">
+                        <div class="step-num">3</div>
+                        <div class="step-info">
+                            <h4>Run your app with secrets</h4>
+                            <div class="code-block">
+                                <code>nvolt run npm start</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cta-footer">
+                    <a href="docs.html" class="btn btn-large btn-primary">Read Full Documentation</a>
+                    <a href="https://github.com/iluxav/nvolt" class="btn btn-large btn-secondary" target="_blank" rel="noopener">Star on GitHub</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <img src="assets/logo.png" alt="nvolt" class="footer-logo" width="120">
+                    <p>Zero-Trust, Git-native secret manager built for developers.</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#comparison">Comparison</a></li>
+                        <li><a href="docs.html">Documentation</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://github.com/iluxav/nvolt" target="_blank" rel="noopener">GitHub</a></li>
+                        <li><a href="https://github.com/iluxav/nvolt/issues" target="_blank" rel="noopener">Issues</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Community</h4>
+                    <ul>
+                        <li><a href="https://github.com/iluxav/nvolt/discussions" target="_blank" rel="noopener">Discussions</a></li>
+                        <li><a href="https://twitter.com/nvolt" target="_blank" rel="noopener">Twitter</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 nvolt. Open source under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
