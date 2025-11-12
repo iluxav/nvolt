@@ -442,6 +442,81 @@ func findVaultPath() (string, error) {
 	return vaultPath, nil
 }
 
+// ProjectResolvedInfo contains resolved project information for composition
+type ProjectResolvedInfo struct {
+	ProjectName string // The project name used for vault paths (empty for local mode)
+	VaultPath   string // The vault path (either local .nvolt or global ~/.nvolt/orgs/org/repo)
+	DisplayName string // The display name for UI messages
+}
+
+// resolveProjects resolves a list of project names into their vault paths
+// If no projects are provided, it auto-detects the current project
+func resolveProjects(projectNames []string) ([]ProjectResolvedInfo, error) {
+	var result []ProjectResolvedInfo
+
+	// Always check for local .nvolt first
+	localPath, err := vault.GetLocalVaultPath()
+	hasLocal := err == nil && vault.IsVaultInitialized(localPath)
+
+	if hasLocal {
+		// Local mode available - add it as base layer
+		result = append(result, ProjectResolvedInfo{
+			ProjectName: "",
+			VaultPath:   localPath,
+			DisplayName: "(local)",
+		})
+	}
+
+	// If no projects specified
+	if len(projectNames) == 0 {
+		// If we have local, we're done
+		if hasLocal {
+			return result, nil
+		}
+
+		// No local - auto-detect project name from current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		detectedProject, _, err := config.GetProjectName(cwd, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect project name. Use -p flag to specify: %w", err)
+		}
+
+		// Find global vault
+		vaultPath, err := findVaultPath()
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, ProjectResolvedInfo{
+			ProjectName: detectedProject,
+			VaultPath:   vaultPath,
+			DisplayName: detectedProject,
+		})
+		return result, nil
+	}
+
+	// Projects specified - add them all from global mode
+	// (on top of local if it exists)
+	vaultPath, err := findVaultPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find global vault: %w", err)
+	}
+
+	for _, projectName := range projectNames {
+		result = append(result, ProjectResolvedInfo{
+			ProjectName: projectName,
+			VaultPath:   vaultPath,
+			DisplayName: projectName,
+		})
+	}
+
+	return result, nil
+}
+
 // findGlobalVault searches for a vault in ~/.nvolt/orgs/
 // Returns the first valid repo root found in the structure: ~/.nvolt/orgs/org/repo
 // In global mode, the repo root contains machines/ directory at the top level
